@@ -60,13 +60,15 @@ config SOC_STARFIVE
 	  This enables support for StarFive SoC platform hardware.
 
 config ARCH_SUNXI
-	bool "Allwinner sun20i SoCs"
+	bool "Allwinner Sunxi SoCs"
 	depends on MMU
+	select PINCTRL
+	select PINCTRL_SUNXI
 	select ERRATA_THEAD
 	select SUN4I_TIMER
 	help
-	  This enables support for Allwinner sun20i platform hardware,
-	  including boards based on the D1 and D1s SoCs.
+	  This enables support for Allwinner Sunxi platform hardware,
+	  including boards based on the D1, D1s, and sun252i F101 SoCs.
 
 config ARCH_TENSTORRENT
 	bool "Tenstorrent SoCs"
