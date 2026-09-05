@@ -748,6 +748,18 @@ config PWM_SUN4I
 	  To compile this driver as a module, choose M here: the module
 	  will be called pwm-sun4i.
 
+config PWM_SUNXI
+	tristate "Allwinner SUN252i F101 PWM support"
+	depends on ARCH_SUNXI || COMPILE_TEST
+	depends on HAS_IOMEM && COMMON_CLK
+	help
+	  Generic PWM framework driver for the PWM controller on the
+	  SUN252i F101. It is a trimmed port of the Tina/BSP pwm-sunxi
+	  driver supporting single-channel output only.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called pwm-sunxi.
+
 config PWM_SUNPLUS
 	tristate "Sunplus PWM support"
 	depends on ARCH_SUNPLUS || COMPILE_TEST

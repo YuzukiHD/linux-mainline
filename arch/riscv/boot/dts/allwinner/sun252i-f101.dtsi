@@ -120,6 +120,16 @@
 			#reset-cells = <1>;
 		};
 
+		pwm0: pwm@2000c00 {
+			compatible = "allwinner,sunxi-pwm-v201",
+				     "allwinner,sun252i-f101-pwm";
+			reg = <0x0 0x02000c00 0x0 0x400>;
+			clocks = <&ccu CLK_BUS_PWM>;
+			resets = <&ccu RST_BUS_PWM>;
+			#pwm-cells = <3>;
+			status = "disabled";
+		};
+
 		pio: pinctrl@2000000 {
 			compatible = "allwinner,sun252i-f101-pinctrl";
 			reg = <0x0 0x02000000 0x0 0x500>;
@@ -140,9 +150,25 @@
 				function = "uart0";
 			};
 
+			pwm0_pe2_pins: pwm0-pe2-pins {
+				pins = "PE2";
+				function = "pwm0_0";
+			};
 
+			pwm0_pe3_pins: pwm0-pe3-pins {
+				pins = "PE3";
+				function = "pwm0_1";
+			};
 
+			pwm0_pe4_pins: pwm0-pe4-pins {
+				pins = "PE4";
+				function = "pwm0_2";
+			};
 
+			pwm0_pe5_pins: pwm0-pe5-pins {
+				pins = "PE5";
+				function = "pwm0_3";
+			};
 
 			uart1_pb_pins: uart1-pb-pins {
 				pins = "PB0", "PB1";
