@@ -69,6 +69,11 @@ properties:
           - const: widora,mangopi-mq-r-f133
           - const: allwinner,sun20i-d1s
 
+      - description: YuzukiHD Yuzukineko board
+        items:
+          - const: allwinner,sun252i-f101-yuzukineko
+          - const: allwinner,sun252i-f101
+
 additionalProperties: true
 
 ...
