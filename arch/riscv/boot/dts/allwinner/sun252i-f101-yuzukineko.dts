@@ -8,7 +8,7 @@
 	compatible = "allwinner,sun252i-f101-yuzukineko", "allwinner,sun252i-f101";
 
 	chosen {
-		bootargs = "console=ttyS1,115200n8 earlycon=uart8250,mmio32,0x02500400 loglevel=8 printk.time=1";
+		bootargs = "console=ttyS1,115200n8 earlycon=uart8250,mmio32,0x02500400 loglevel=8 printk.time=1 root=/dev/mtdblock4 rootfstype=squashfs ro";
 		stdout-path = "serial1:115200n8";
 	};
 
@@ -41,5 +41,56 @@
 		spi-max-frequency = <100000000>;
 		spi-rx-bus-width = <1>;
 		spi-tx-bus-width = <1>;
+
+		/*
+		 * 16 MiB NOR layout. Keep in sync with the SyterKit spinor-boot
+		 * reader and the Buildroot post-image-nor.sh image builder.
+		 *	0x000000 bootloader (SyterKit, 64 KiB)
+		 *	0x010000 device tree (256 KiB)
+		 *	0x050000 fw_jump     (OpenSBI, 512 KiB)
+		 *	0x0d0000 kernel Image (6 MiB)
+		 *	0x6d0000 rootfs squashfs (to 0xf00000)
+		 *	0xf00000 overlay JFFS2 (last 1 MiB)
+		 */
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			bootloader@0 {
+				label = "bootloader";
+				reg = <0x000000 0x010000>;
+				read-only;
+			};
+
+			dtb@10000 {
+				label = "dtb";
+				reg = <0x010000 0x040000>;
+				read-only;
+			};
+
+			opensbi@50000 {
+				label = "opensbi";
+				reg = <0x050000 0x080000>;
+				read-only;
+			};
+
+			kernel@d0000 {
+				label = "kernel";
+				reg = <0x0d0000 0x600000>;
+				read-only;
+			};
+
+			rootfs@6d0000 {
+				label = "rootfs";
+				reg = <0x6d0000 0x830000>;
+				read-only;
+			};
+
+			overlay@f00000 {
+				label = "overlay";
+				reg = <0xf00000 0x100000>;
+			};
+		};
 	};
 };
