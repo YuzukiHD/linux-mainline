@@ -1,0 +1,122 @@
+/* SPDX-License-Identifier: (GPL-2.0-only OR MIT) */
+/* Clock bindings for the Allwinner sun252i F101 CCU. */
+
+#ifndef _DT_BINDINGS_CLK_SUN252I_F101_CCU_H_
+#define _DT_BINDINGS_CLK_SUN252I_F101_CCU_H_
+
+#define CLK_PLL_PERI			0
+#define CLK_PLL_PERI_2X			1
+#define CLK_PLL_PERI_1X			2
+#define CLK_PLL_PERI_800M		3
+#define CLK_PLL_PERI_480M		4
+#define CLK_PLL_VIDEO0_4X		5
+#define CLK_PLL_VIDEO0_2X		6
+#define CLK_PLL_VIDEO0_1X		7
+#define CLK_PLL_AUDIO1			8
+#define CLK_PLL_AUDIO1_DIV2		9
+#define CLK_PLL_AUDIO1_DIV5		10
+#define CLK_PSI			11
+#define CLK_APB0			12
+#define CLK_APB1			13
+#define CLK_APB_UART			14
+#define CLK_MBUS			15
+#define CLK_DE			16
+#define CLK_BUS_DE			17
+#define CLK_DI			18
+#define CLK_BUS_DI			19
+#define CLK_G2D			20
+#define CLK_BUS_G2D			21
+#define CLK_CE			22
+#define CLK_BUS_CE			23
+#define CLK_VE			24
+#define CLK_BUS_VE			25
+#define CLK_BUS_DMA			26
+#define CLK_BUS_HSTIMER		27
+#define CLK_BUS_AVS			28
+#define CLK_BUS_DBGSYS		29
+#define CLK_PWM_BL			30
+#define CLK_BUS_PWM_BL		31
+#define CLK_BUS_PWM			32
+#define CLK_BUS_G2D_M			33
+#define CLK_BUS_CSI_M			34
+#define CLK_BUS_TVIN_M		35
+#define CLK_BUS_VE_M			36
+#define CLK_BUS_DMA_M		37
+#define CLK_BUS_DRAM			38
+#define CLK_SMHC0			39
+#define CLK_SMHC2			40
+#define CLK_BUS_SMHC2		41
+#define CLK_BUS_SMHC0		42
+#define CLK_BUS_UART5		43
+#define CLK_BUS_UART4		44
+#define CLK_BUS_UART3		45
+#define CLK_BUS_UART2		46
+#define CLK_BUS_UART1		47
+#define CLK_BUS_UART0		48
+#define CLK_BUS_TWI2		49
+#define CLK_BUS_TWI1		50
+#define CLK_BUS_TWI0		51
+#define CLK_SPI0			52
+#define CLK_SPI1			53
+#define CLK_BUS_SPI1		54
+#define CLK_BUS_SPI0		55
+#define CLK_SPIF			56
+#define CLK_BUS_SPIF		57
+#define CLK_IRRX			58
+#define CLK_BUS_IRRX		59
+#define CLK_CAN0			60
+#define CLK_CAN1			61
+#define CLK_BUS_GPADC		62
+#define CLK_BUS_THS		63
+#define CLK_I2S0			64
+#define CLK_BUS_I2S0		65
+#define CLK_OWA_TX			66
+#define CLK_OWA_RX			67
+#define CLK_BUS_OWA		68
+#define CLK_AUDIO_CODEC_DAC		69
+#define CLK_AUDIO_CODEC_ADC		70
+#define CLK_BUS_AUDIO_CODEC		71
+#define CLK_BUS_USB			72
+#define CLK_BUS_USBOTG0		73
+#define CLK_BUS_USBEHCI0		74
+#define CLK_BUS_USBOHCI0		75
+#define CLK_COMBOPHY0		76
+#define CLK_BUS_COMBOPHY0		77
+#define CLK_BUS_DPSS_TOP		78
+#define CLK_DSI			79
+#define CLK_BUS_DSI		80
+#define CLK_TCONLCD			81
+#define CLK_BUS_TCONLCD		82
+#define CLK_CSI			83
+#define CLK_CSI_MASTER		84
+#define CLK_BUS_CSI			85
+#define CLK_TVIN_MASTER		86
+#define CLK_BUS_TVIN			87
+#define CLK_BUS_TVIN_TOP		88
+#define CLK_TPADC			89
+#define CLK_BUS_TPADC		90
+#define CLK_BUS_RISCV_CFG		91
+#define CLK_BUS_CLK32K		92
+#define CLK_BUS_CLK25M		93
+#define CLK_BUS_CLK16M		94
+#define CLK_BUS_CLK12M		95
+#define CLK_BUS_CLK24M		96
+#define CLK_PCLK			97
+#define CLK_BUS_CLK_FANOUT2		98
+#define CLK_BUS_CLK_FANOUT1		99
+#define CLK_BUS_CLK_FANOUT0		100
+
+#define CLK_NUMBER			101
+
+/* Compatibility aliases used by the board DTS. */
+#define SUN252I_F101_CLK_APB0		CLK_APB0
+#define SUN252I_F101_CLK_APB_UART	CLK_APB_UART
+#define SUN252I_F101_CLK_BUS_UART0	CLK_BUS_UART0
+#define SUN252I_F101_CLK_BUS_UART1	CLK_BUS_UART1
+#define SUN252I_F101_CLK_BUS_UART2	CLK_BUS_UART2
+#define SUN252I_F101_CLK_BUS_UART3	CLK_BUS_UART3
+#define SUN252I_F101_CLK_BUS_UART4	CLK_BUS_UART4
+#define SUN252I_F101_CLK_BUS_UART5	CLK_BUS_UART5
+#define SUN252I_F101_CLK_NUMBER		CLK_NUMBER
+
+#endif

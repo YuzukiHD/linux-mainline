@@ -55,6 +55,7 @@ obj-$(CONFIG_SUN9I_A80_CCU)	+= sun9i-a80-usb-ccu.o
 suniv-f1c100s-ccu-y		+= ccu-suniv-f1c100s.o
 sun20i-d1-ccu-y			+= ccu-sun20i-d1.o
 sun20i-d1-r-ccu-y		+= ccu-sun20i-d1-r.o
+sunxi-ccu-y			+= ccu-sun252i-f101.o
 sunxi-ccu-y			+= ccu-sun252i-f101-cpupll.o
 sunxi-ccu-y			+= ccu-sun252i-f101-ddrpll.o
 sunxi-ccu-y			+= ccu-sun252i-f101-rtc.o
