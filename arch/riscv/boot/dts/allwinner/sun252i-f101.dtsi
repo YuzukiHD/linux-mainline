@@ -1,0 +1,235 @@
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
+
+#include <dt-bindings/clock/sun252i-f101-ccu.h>
+#include <dt-bindings/clock/sun252i-f101-cpupll.h>
+#include <dt-bindings/clock/sun252i-f101-rtc.h>
+#include <dt-bindings/interrupt-controller/irq.h>
+#include <dt-bindings/reset/sun252i-f101-ccu.h>
+
+/ {
+	#address-cells = <2>;
+	#size-cells = <2>;
+	compatible = "allwinner,sun252i-f101";
+
+	aliases {
+		serial0 = &uart0;
+		serial1 = &uart1;
+		serial2 = &uart2;
+		serial3 = &uart3;
+		serial4 = &uart4;
+		serial5 = &uart5;
+	};
+
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		opensbi@40f80000 {
+			reg = <0x0 0x40f80000 0x0 0x80000>;
+		};
+	};
+
+	osc24M: oscillator-24M {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <24000000>;
+		clock-output-names = "dcxo24M";
+	};
+
+	rc16m: oscillator-16M {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <16000000>;
+		clock-output-names = "rc-16m";
+	};
+
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		timebase-frequency = <24000000>;
+
+		cpu0: cpu@0 {
+			compatible = "thead,c907", "riscv";
+			device_type = "cpu";
+			reg = <0>;
+			mmu-type = "riscv,sv32";
+			clocks = <&cpupll_ccu CLK_RISCV>;
+			riscv,isa-base = "rv32i";
+			riscv,cbom-block-size = <64>;
+			riscv,cboz-block-size = <64>;
+			riscv,isa-extensions = "i", "m", "a", "f", "d", "c", "v",
+						     "zicbom", "zicbop", "zicboz", "zicond", "zihintntl",
+						     "zihintpause", "zawrs", "zfa", "zfbfmin", "zfh", "zba",
+						     "zbb", "zbc", "zbs", "sscofpmf", "zvfbfmin", "zvfbfwma",
+						     "svinval", "svnapot", "svpbmt", "xtheadc", "xtheadvdot";
+			d-cache-block-size = <64>;
+			i-cache-block-size = <64>;
+
+			cpu0_intc: interrupt-controller {
+				compatible = "riscv,cpu-intc";
+				interrupt-controller;
+				#interrupt-cells = <1>;
+			};
+		};
+	};
+
+	soc: soc {
+		compatible = "simple-bus";
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+		interrupt-parent = <&plic>;
+
+		plic: interrupt-controller@10000000 {
+			compatible = "thead,c900-plic";
+			reg = <0x0 0x10000000 0x0 0x4000000>;
+			interrupts-extended = <&cpu0_intc 11>, <&cpu0_intc 9>;
+			interrupt-controller;
+			#address-cells = <0>;
+			#interrupt-cells = <2>;
+			riscv,max-priority = <7>;
+			riscv,ndev = <200>;
+		};
+
+		clint: timer@14000000 {
+			compatible = "thead,c900-clint";
+			reg = <0x0 0x14000000 0x0 0x10000>;
+			interrupts-extended = <&cpu0_intc 7>, <&cpu0_intc 3>;
+		};
+
+		rtc_ccu: rtc-ccu@3090000 {
+			compatible = "allwinner,sun252i-f101-rtc-ccu";
+			reg = <0x0 0x03090000 0x0 0x330>;
+			clocks = <&osc24M>, <&rc16m>;
+			clock-names = "dcxo24M", "rc-16m";
+			#clock-cells = <1>;
+		};
+
+		cpupll_ccu: cpupll@2001000 {
+			compatible = "allwinner,sun252i-f101-cpupll";
+			reg = <0x0 0x02001000 0x0 0x1000>;
+			#clock-cells = <1>;
+		};
+
+		ddrpll_ccu: ddrpll@2001000 {
+			compatible = "allwinner,sun252i-f101-ddrpll";
+			reg = <0x0 0x02001000 0x0 0x1000>;
+			#clock-cells = <1>;
+		};
+
+		ccu: ccu@2001000 {
+			compatible = "allwinner,sun252i-f101-ccu";
+			reg = <0x0 0x02001000 0x0 0x1000>;
+			clocks = <&osc24M>, <&rtc_ccu CLK_RTC_32K>,
+				 <&rtc_ccu CLK_RTC_IOSC>;
+			clock-names = "hosc", "losc", "iosc";
+			#clock-cells = <1>;
+			#reset-cells = <1>;
+		};
+
+		pio: pinctrl@2000000 {
+			compatible = "allwinner,sun252i-f101-pinctrl";
+			reg = <0x0 0x02000000 0x0 0x500>;
+			interrupts-extended = <&plic 67 IRQ_TYPE_LEVEL_HIGH>,
+					      <&plic 69 IRQ_TYPE_LEVEL_HIGH>,
+					      <&plic 71 IRQ_TYPE_LEVEL_HIGH>,
+					      <&plic 73 IRQ_TYPE_LEVEL_HIGH>,
+					      <&plic 75 IRQ_TYPE_LEVEL_HIGH>,
+					      <&plic 77 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&ccu SUN252I_F101_CLK_APB0>;
+			gpio-controller;
+			#gpio-cells = <3>;
+			interrupt-controller;
+			#interrupt-cells = <3>;
+
+			uart0_pe_pins: uart0-pe-pins {
+				pins = "PE0", "PE1";
+				function = "uart0";
+			};
+
+			uart1_pb_pins: uart1-pb-pins {
+				pins = "PB0", "PB1";
+				function = "uart1";
+			};
+		};
+
+		uart0: serial@2500000 {
+			compatible = "snps,dw-apb-uart";
+			reg = <0x0 0x02500000 0x0 0x400>;
+			interrupts-extended = <&plic 2 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&ccu SUN252I_F101_CLK_BUS_UART0>,
+				 <&ccu SUN252I_F101_CLK_BUS_UART0>;
+			clock-names = "baudclk", "apb_pclk";
+			resets = <&ccu SUN252I_F101_RST_BUS_UART0>;
+			reg-shift = <2>;
+			reg-io-width = <4>;
+			status = "disabled";
+		};
+
+		uart1: serial@2500400 {
+			compatible = "snps,dw-apb-uart";
+			reg = <0x0 0x02500400 0x0 0x400>;
+			interrupts-extended = <&plic 3 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&ccu SUN252I_F101_CLK_BUS_UART1>,
+				 <&ccu SUN252I_F101_CLK_BUS_UART1>;
+			clock-names = "baudclk", "apb_pclk";
+			resets = <&ccu SUN252I_F101_RST_BUS_UART1>;
+			reg-shift = <2>;
+			reg-io-width = <4>;
+			status = "disabled";
+		};
+
+		uart2: serial@2500800 {
+			compatible = "snps,dw-apb-uart";
+			reg = <0x0 0x02500800 0x0 0x400>;
+			interrupts-extended = <&plic 4 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&ccu SUN252I_F101_CLK_BUS_UART2>,
+				 <&ccu SUN252I_F101_CLK_BUS_UART2>;
+			clock-names = "baudclk", "apb_pclk";
+			resets = <&ccu SUN252I_F101_RST_BUS_UART2>;
+			reg-shift = <2>;
+			reg-io-width = <4>;
+			status = "disabled";
+		};
+
+		uart3: serial@2500c00 {
+			compatible = "snps,dw-apb-uart";
+			reg = <0x0 0x02500c00 0x0 0x400>;
+			interrupts-extended = <&plic 5 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&ccu SUN252I_F101_CLK_BUS_UART3>,
+				 <&ccu SUN252I_F101_CLK_BUS_UART3>;
+			clock-names = "baudclk", "apb_pclk";
+			resets = <&ccu SUN252I_F101_RST_BUS_UART3>;
+			reg-shift = <2>;
+			reg-io-width = <4>;
+			status = "disabled";
+		};
+
+		uart4: serial@2501000 {
+			compatible = "snps,dw-apb-uart";
+			reg = <0x0 0x02501000 0x0 0x400>;
+			interrupts-extended = <&plic 6 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&ccu SUN252I_F101_CLK_BUS_UART4>,
+				 <&ccu SUN252I_F101_CLK_BUS_UART4>;
+			clock-names = "baudclk", "apb_pclk";
+			resets = <&ccu SUN252I_F101_RST_BUS_UART4>;
+			reg-shift = <2>;
+			reg-io-width = <4>;
+			status = "disabled";
+		};
+
+		uart5: serial@2501400 {
+			compatible = "snps,dw-apb-uart";
+			reg = <0x0 0x02501400 0x0 0x400>;
+			interrupts-extended = <&plic 7 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&ccu SUN252I_F101_CLK_BUS_UART5>,
+				 <&ccu SUN252I_F101_CLK_BUS_UART5>;
+			clock-names = "baudclk", "apb_pclk";
+			resets = <&ccu SUN252I_F101_RST_BUS_UART5>;
+			reg-shift = <2>;
+			reg-io-width = <4>;
+			status = "disabled";
+		};
+	};
+};
