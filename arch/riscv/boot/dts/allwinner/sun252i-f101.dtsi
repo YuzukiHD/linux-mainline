@@ -20,16 +20,6 @@
 		serial5 = &uart5;
 	};
 
-	reserved-memory {
-		#address-cells = <2>;
-		#size-cells = <2>;
-		ranges;
-
-		opensbi@40f80000 {
-			reg = <0x0 0x40f80000 0x0 0x80000>;
-		};
-	};
-
 	osc24M: oscillator-24M {
 		compatible = "fixed-clock";
 		#clock-cells = <0>;
