@@ -23,3 +23,9 @@
 	pinctrl-0 = <&uart1_pb_pins>;
 	status = "okay";
 };
+
+&i2c2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c2_pb2_pins>;
+	status = "okay";
+};
