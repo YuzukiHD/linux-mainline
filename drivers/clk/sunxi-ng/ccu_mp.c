@@ -115,7 +115,8 @@ static int ccu_mp_determine_rate_helper(struct ccu_mux_internal *mux,
 	if (cmp->common.features & CCU_FEATURE_FIXED_POSTDIV)
 		req->rate *= cmp->fixed_post_div;
 
-	if (cmp->common.features & CCU_FEATURE_DUAL_DIV)
+	if (cmp->common.features & (CCU_FEATURE_DUAL_DIV |
+					   CCU_FEATURE_MP_NO_INDEX_MODE))
 		shift = false;
 
 	max_m = cmp->m.max ?: 1 << cmp->m.width;
@@ -184,7 +185,8 @@ static unsigned long ccu_mp_recalc_rate(struct clk_hw *hw,
 	p = reg >> cmp->p.shift;
 	p &= (1 << cmp->p.width) - 1;
 
-	if (cmp->common.features & CCU_FEATURE_DUAL_DIV)
+	if (cmp->common.features & (CCU_FEATURE_DUAL_DIV |
+					   CCU_FEATURE_MP_NO_INDEX_MODE))
 		rate = (parent_rate / (p + cmp->p.offset)) / m;
 	else
 		rate = (parent_rate >> p) / m;
@@ -214,7 +216,8 @@ static int ccu_mp_set_rate(struct clk_hw *hw, unsigned long rate,
 	bool shift = true;
 	u32 reg;
 
-	if (cmp->common.features & CCU_FEATURE_DUAL_DIV)
+	if (cmp->common.features & (CCU_FEATURE_DUAL_DIV |
+					   CCU_FEATURE_MP_NO_INDEX_MODE))
 		shift = false;
 
 	/* Adjust parent_rate according to pre-dividers */

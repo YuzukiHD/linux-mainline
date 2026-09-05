@@ -21,6 +21,8 @@
 #define CCU_FEATURE_CLOSEST_RATE	BIT(9)
 #define CCU_FEATURE_DUAL_DIV		BIT(10)
 #define CCU_FEATURE_UPDATE_BIT		BIT(11)
+/* M/P clocks with a linear P divider instead of a power-of-two index. */
+#define CCU_FEATURE_MP_NO_INDEX_MODE	BIT(12)
 
 /* MMC timing mode switch bit */
 #define CCU_MMC_NEW_TIMING_MODE		BIT(30)
