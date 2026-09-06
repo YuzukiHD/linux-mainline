@@ -34,6 +34,7 @@ properties:
           - allwinner,sun8i-a23-system-control
           - allwinner,sun8i-h3-system-control
           - allwinner,sun20i-d1-system-control
+          - allwinner,sun252i-f101-system-control
           - allwinner,sun50i-a64-system-control
           - allwinner,sun50i-h5-system-control
           - allwinner,sun50i-h616-system-control
@@ -81,6 +82,7 @@ patternProperties:
               - const: allwinner,sun4i-a10-sram-d
               - const: allwinner,sun50i-a64-sram-c
               - const: allwinner,sun50i-h616-ve-sram
+              - const: allwinner,sun252i-f101-sram-ve
               - items:
                   - enum:
                       - allwinner,sun5i-a13-sram-a3-a4

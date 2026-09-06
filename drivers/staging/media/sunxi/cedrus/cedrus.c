@@ -623,6 +623,14 @@ static const struct cedrus_variant sun20i_d1_cedrus_variant = {
 	.mod_rate	= 432000000,
 };
 
+static const struct cedrus_variant sun252i_f101_cedrus_variant = {
+	.capabilities	= CEDRUS_CAPABILITY_UNTILED |
+			  CEDRUS_CAPABILITY_MPEG2_DEC |
+			  CEDRUS_CAPABILITY_H264_DEC |
+			  CEDRUS_CAPABILITY_H265_DEC,
+	.mod_rate	= 512000000,
+};
+
 static const struct cedrus_variant sun50i_a64_cedrus_variant = {
 	.capabilities	= CEDRUS_CAPABILITY_UNTILED |
 			  CEDRUS_CAPABILITY_MPEG2_DEC |
@@ -683,6 +691,10 @@ static const struct of_device_id cedrus_dt_match[] = {
 	{
 		.compatible = "allwinner,sun20i-d1-video-engine",
 		.data = &sun20i_d1_cedrus_variant,
+	},
+	{
+		.compatible = "allwinner,sun252i-f101-video-engine",
+		.data = &sun252i_f101_cedrus_variant,
 	},
 	{
 		.compatible = "allwinner,sun50i-a64-video-engine",

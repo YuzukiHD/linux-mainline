@@ -20,6 +20,8 @@
 		serial5 = &uart5;
 		spi0 = &spi0;
 		spi1 = &spi1;
+		mmc0 = &sdc0;
+		mmc1 = &sdc2;
 	};
 
 	osc24M: oscillator-24M {
@@ -120,6 +122,40 @@
 			#reset-cells = <1>;
 		};
 
+		ve: video-codec@1c0e000 {
+			compatible = "allwinner,sun252i-f101-video-engine";
+			reg = <0x0 0x01c0e000 0x0 0x2000>;
+			interrupts = <66 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&ccu CLK_BUS_VE>,
+				 <&ccu CLK_VE>,
+				 <&ccu CLK_BUS_VE_M>;
+			clock-names = "ahb", "mod", "ram";
+			resets = <&ccu RST_BUS_VE>;
+			allwinner,sram = <&ve_sram_section 1>;
+			status = "disabled";
+		};
+
+		syscon: syscon@3000000 {
+			compatible = "allwinner,sun252i-f101-system-control";
+			reg = <0x0 0x03000000 0x0 0x1000>;
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges = <0x0 0x0 0x0 0x40000000>;
+
+			ve_sram: sram@20000 {
+				compatible = "mmio-sram";
+				reg = <0x20000 0xb000>;
+				#address-cells = <1>;
+				#size-cells = <1>;
+				ranges = <0 0x20000 0xb000>;
+
+				ve_sram_section: sram-section@0 {
+					compatible = "allwinner,sun252i-f101-sram-ve";
+					reg = <0x0 0xb000>;
+				};
+			};
+		};
+
 		pwm0: pwm@2000c00 {
 			compatible = "allwinner,sunxi-pwm-v201",
 				     "allwinner,sun252i-f101-pwm";
@@ -188,6 +224,20 @@
 			spi1_pd_pins: spi1-pd-pins {
 				pins = "PD0", "PD1", "PD2", "PD3";
 				function = "spi1";
+			};
+
+			sdc0_pf_pins: sdc0-pf-pins {
+				pins = "PF0", "PF1", "PF2", "PF3", "PF4", "PF5";
+				function = "sdc0";
+				drive-strength = <40>;
+				bias-pull-up;
+			};
+
+			sdc2_pc_pins: sdc2-pc-pins {
+				pins = "PC0", "PC1", "PC2", "PC3", "PC4", "PC5";
+				function = "sdc2";
+				drive-strength = <40>;
+				bias-pull-up;
 			};
 		};
 
@@ -320,6 +370,44 @@
 			dma-channels = <16>;
 			dma-requests = <48>;
 			#dma-cells = <1>;
+		};
+
+		sdc0: mmc@4020000 {
+			compatible = "allwinner,sun252i-f101-mmc";
+			reg = <0x0 0x04020000 0x0 0x1000>;
+			interrupts-extended = <&plic 40 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&ccu CLK_BUS_SMHC0>, <&ccu CLK_SMHC0>;
+			clock-names = "ahb", "mmc";
+			resets = <&ccu RST_BUS_SMHC0>;
+			reset-names = "ahb";
+			pinctrl-names = "default";
+			pinctrl-0 = <&sdc0_pf_pins>;
+			bus-width = <4>;
+			max-frequency = <50000000>;
+			cap-sd-highspeed;
+			no-mmc;
+			no-sdio;
+			broken-cd;
+			status = "disabled";
+		};
+
+		sdc2: mmc@4022000 {
+			compatible = "allwinner,sun252i-f101-emmc";
+			reg = <0x0 0x04022000 0x0 0x1000>;
+			interrupts-extended = <&plic 42 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&ccu CLK_BUS_SMHC2>, <&ccu CLK_SMHC2>;
+			clock-names = "ahb", "mmc";
+			resets = <&ccu RST_BUS_SMHC2>;
+			reset-names = "ahb";
+			pinctrl-names = "default";
+			pinctrl-0 = <&sdc2_pc_pins>;
+			bus-width = <4>;
+			max-frequency = <50000000>;
+			cap-mmc-highspeed;
+			no-sd;
+			no-sdio;
+			non-removable;
+			status = "disabled";
 		};
 
 		spi0: spi@4025000 {
