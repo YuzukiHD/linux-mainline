@@ -3,6 +3,7 @@
 #include <dt-bindings/clock/sun252i-f101-ccu.h>
 #include <dt-bindings/clock/sun252i-f101-cpupll.h>
 #include <dt-bindings/clock/sun252i-f101-rtc.h>
+#include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/interrupt-controller/irq.h>
 #include <dt-bindings/reset/sun252i-f101-ccu.h>
 
@@ -385,9 +386,9 @@
 			bus-width = <4>;
 			max-frequency = <50000000>;
 			cap-sd-highspeed;
+			no-1-8-v;
 			no-mmc;
 			no-sdio;
-			broken-cd;
 			status = "disabled";
 		};
 
@@ -404,6 +405,7 @@
 			bus-width = <4>;
 			max-frequency = <50000000>;
 			cap-mmc-highspeed;
+			no-1-8-v;
 			no-sd;
 			no-sdio;
 			non-removable;

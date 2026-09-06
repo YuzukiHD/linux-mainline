@@ -30,6 +30,7 @@
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
+#include <linux/property.h>
 #include <linux/regulator/consumer.h>
 #include <linux/reset.h>
 #include <linux/scatterlist.h>
@@ -1436,12 +1437,21 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
 	 */
 	if ((host->cfg->clk_delays || host->use_new_timings) &&
 	    !of_device_is_compatible(pdev->dev.of_node,
-				     "allwinner,sun50i-h5-emmc"))
-		mmc->caps      |= MMC_CAP_1_8V_DDR | MMC_CAP_3_3V_DDR;
+				     "allwinner,sun50i-h5-emmc")) {
+		mmc->caps |= MMC_CAP_3_3V_DDR;
+		if (!device_property_read_bool(&pdev->dev, "no-1-8-v"))
+			mmc->caps |= MMC_CAP_1_8V_DDR;
+	}
 
 	ret = mmc_of_parse(mmc);
 	if (ret)
 		goto error_free_dma;
+
+	if (device_property_read_bool(&pdev->dev, "no-1-8-v")) {
+		mmc->caps &= ~(MMC_CAP_UHS | MMC_CAP_1_8V_DDR);
+		mmc->caps2 &= ~(MMC_CAP2_HS200_1_8V_SDR |
+				MMC_CAP2_HS400_1_8V);
+	}
 
 	/*
 	 * If we don't support delay chains in the SoC, we can't use any
