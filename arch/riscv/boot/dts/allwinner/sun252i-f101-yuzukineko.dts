@@ -42,7 +42,7 @@
 	vmmc-supply = <&reg_vcc_3v3>;
 	vqmmc-supply = <&reg_vcc_3v3>;
 	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>; /* PF6 */
-	status = "okay";
+	status = "disabled";
 };
 
 &ve {
