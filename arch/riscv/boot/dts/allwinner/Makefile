@@ -10,3 +10,4 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun20i-d1-mangopi-mq-pro.dtb
 dtb-$(CONFIG_ARCH_SUNXI) += sun20i-d1-nezha.dtb
 dtb-$(CONFIG_ARCH_SUNXI) += sun20i-d1s-mangopi-mq.dtb
 dtb-$(CONFIG_ARCH_SUNXI) += sun252i-f101-yuzukineko.dtb
+dtb-$(CONFIG_ARCH_SUNXI) += sun252i-f101-yuzukineko-rv64i.dtb

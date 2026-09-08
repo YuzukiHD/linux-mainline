@@ -2,3 +2,8 @@
 /dts-v1/;
 
 #include "sun252i-f101-yuzukineko-common.dtsi"
+
+&cpu0 {
+	mmu-type = "riscv,sv39";
+	riscv,isa-base = "rv64i";
+};
