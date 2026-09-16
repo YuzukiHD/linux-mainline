@@ -30,7 +30,9 @@ properties:
           - const: allwinner,sun6i-a31-wdt
       - const: allwinner,sun20i-d1-wdt
       - items:
-          - const: allwinner,sun20i-d1-wdt-reset
+          - enum:
+              - allwinner,sun20i-d1-wdt-reset
+              - allwinner,sun252i-f101-wdt
           - const: allwinner,sun20i-d1-wdt
       - const: allwinner,sun55i-a523-wdt
 
