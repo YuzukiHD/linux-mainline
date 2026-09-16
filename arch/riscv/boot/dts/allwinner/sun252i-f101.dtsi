@@ -441,5 +441,14 @@
 			clock-frequency = <100000000>;
 			status = "disabled";
 		};
+
+		riscv_wdt: watchdog@6011000 {
+			compatible = "allwinner,sun252i-f101-wdt",
+				     "allwinner,sun20i-d1-wdt";
+			reg = <0x0 0x06011000 0x0 0x20>;
+			interrupts = <131 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&osc24M>, <&rtc_ccu CLK_RTC_32K>;
+			clock-names = "hosc", "losc";
+		};
 	};
 };
