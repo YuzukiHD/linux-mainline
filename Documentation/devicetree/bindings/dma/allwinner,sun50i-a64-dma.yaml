@@ -34,6 +34,9 @@ properties:
               - allwinner,sun55i-a523-dma
               - allwinner,sun55i-a523-mcu-dma
           - const: allwinner,sun50i-a100-dma
+      - items:
+          - const: allwinner,sun252i-f101-dma
+          - const: allwinner,sun20i-d1-dma
 
   reg:
     maxItems: 1
@@ -70,6 +73,7 @@ if:
           - allwinner,sun20i-d1-dma
           - allwinner,sun50i-a100-dma
           - allwinner,sun50i-h6-dma
+          - allwinner,sun252i-f101-dma
 
 then:
   properties:
