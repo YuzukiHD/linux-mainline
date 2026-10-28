@@ -74,6 +74,7 @@
 		#address-cells = <2>;
 		#size-cells = <2>;
 		ranges;
+		dma-noncoherent;
 		interrupt-parent = <&plic>;
 
 		plic: interrupt-controller@10000000 {
