@@ -369,8 +369,8 @@
 				 <&ccu CLK_BUS_DMA_M>;
 			clock-names = "bus", "mbus";
 			resets = <&ccu RST_BUS_DMA>;
-			dma-channels = <16>;
-			dma-requests = <48>;
+			dma-channels = <8>;
+			dma-requests = <64>;
 			#dma-cells = <1>;
 		};
 
@@ -424,6 +424,8 @@
 				 <&ccu CLK_SPI0>;
 			clock-names = "ahb", "mod";
 			resets = <&ccu RST_BUS_SPI0>;
+			dmas = <&dma 22>, <&dma 22>;
+			dma-names = "rx", "tx";
 			clock-frequency = <100000000>;
 			status = "disabled";
 		};
@@ -439,6 +441,8 @@
 				 <&ccu CLK_SPI1>;
 			clock-names = "ahb", "mod";
 			resets = <&ccu RST_BUS_SPI1>;
+			dmas = <&dma 23>, <&dma 23>;
+			dma-names = "rx", "tx";
 			clock-frequency = <100000000>;
 			status = "disabled";
 		};
