@@ -272,22 +272,24 @@ static SUNXI_CCU_GATE(dram_bus_clk, "dram-bus",
 
 static const char * const smhc0_parents[] = { "dcxo24M", "pll-peri-1x", "pll-peri-2x", "pll-audio1-div2" };
 
-static SUNXI_CCU_MP_WITH_MUX_GATE(smhc0_clk, "smhc0",
+static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(smhc0_clk, "smhc0",
 			smhc0_parents, 0x0830,
 			0, 4,
 			8, 2,
 			24, 3,
 			BIT(31),
+			2,	/* post-div */
 			0);
 
 static const char * const smhc2_parents[] = { "dcxo24M", "pll-peri-1x", "pll-peri-2x", "pll-peri-800m", "pll-audio1-div2" };
 
-static SUNXI_CCU_MP_WITH_MUX_GATE(smhc2_clk, "smhc2",
+static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(smhc2_clk, "smhc2",
 			smhc2_parents, 0x0838,
 			0, 4,
 			8, 2,
 			24, 3,
 			BIT(31),
+			2,	/* post-div */
 			0);
 
 static SUNXI_CCU_GATE(smhc2_bus_clk, "smhc2-bus",
