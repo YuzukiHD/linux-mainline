@@ -94,6 +94,8 @@ struct sun6i_spi_cfg {
 	unsigned long		fifo_depth;
 	bool			has_clk_ctl;
 	u32			mode_bits;
+	/* RX DMA reads the FIFO a 32 bit word at a time when it can */
+	bool			dma_rx_word;
 };
 
 struct sun6i_spi {
@@ -208,6 +210,24 @@ static void sun6i_spi_dma_rx_cb(void *param)
 	complete(&sspi->dma_rx_done);
 }
 
+/* Can the RX buffer be read from the FIFO in 32 bit words? */
+static bool sun6i_spi_rx_word_aligned(struct sun6i_spi *sspi,
+				      struct spi_transfer *tfr)
+{
+	struct scatterlist *sg;
+	int i;
+
+	if (!sspi->cfg->dma_rx_word)
+		return false;
+
+	for_each_sg(tfr->rx_sg.sgl, sg, tfr->rx_sg.nents, i)
+		if (!IS_ALIGNED(sg_dma_address(sg), 4) ||
+		    !IS_ALIGNED(sg_dma_len(sg), 4))
+			return false;
+
+	return true;
+}
+
 static int sun6i_spi_prepare_dma(struct sun6i_spi *sspi,
 				 struct spi_transfer *tfr)
 {
@@ -219,7 +239,9 @@ static int sun6i_spi_prepare_dma(struct sun6i_spi *sspi,
 		struct dma_slave_config rxconf = {
 			.direction = DMA_DEV_TO_MEM,
 			.src_addr = sspi->dma_addr_rx,
-			.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE,
+			.src_addr_width = sun6i_spi_rx_word_aligned(sspi, tfr) ?
+					  DMA_SLAVE_BUSWIDTH_4_BYTES :
+					  DMA_SLAVE_BUSWIDTH_1_BYTE,
 			.src_maxburst = 8,
 		};
 
@@ -783,10 +805,17 @@ static const struct sun6i_spi_cfg sun50i_r329_spi_cfg = {
 	.mode_bits	= SPI_RX_DUAL | SPI_TX_DUAL | SPI_RX_QUAD | SPI_TX_QUAD,
 };
 
+static const struct sun6i_spi_cfg sun252i_f101_spi_cfg = {
+	.fifo_depth	= SUN8I_FIFO_DEPTH,
+	.mode_bits	= SPI_RX_DUAL | SPI_TX_DUAL | SPI_RX_QUAD | SPI_TX_QUAD,
+	.dma_rx_word	= true,
+};
+
 static const struct of_device_id sun6i_spi_match[] = {
 	{ .compatible = "allwinner,sun6i-a31-spi", .data = &sun6i_a31_spi_cfg },
 	{ .compatible = "allwinner,sun8i-h3-spi",  .data = &sun8i_h3_spi_cfg },
 	{ .compatible = "allwinner,sun50i-r329-spi", .data = &sun50i_r329_spi_cfg },
+	{ .compatible = "allwinner,sun252i-f101-spi", .data = &sun252i_f101_spi_cfg },
 	/*
 	 * A523's SPI controller has a combined RX buffer + FIFO counter
 	 * at offset 0x400, instead of split buffer count in FIFO status
