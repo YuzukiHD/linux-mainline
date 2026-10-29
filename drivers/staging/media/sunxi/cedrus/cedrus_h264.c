@@ -41,6 +41,17 @@ struct cedrus_h264_sram_ref_pic {
 #define CEDRUS_NEIGHBOR_INFO_BUF_SIZE	(32 * SZ_1K)
 #define CEDRUS_MIN_PIC_INFO_BUF_SIZE       (130 * SZ_1K)
 
+/*
+ * Large pictures keep the line buffers of the deblocking and the intra
+ * prediction in memory. The F101 does so for every size: its on chip memory
+ * is not given to the decoder.
+ */
+static bool cedrus_h264_dram_line_bufs(struct cedrus_ctx *ctx)
+{
+	return ctx->src_fmt.width > 2048 ||
+	       cedrus_is_capable(ctx, CEDRUS_CAPABILITY_MODE_INVERTED);
+}
+
 static void cedrus_h264_write_sram(struct cedrus_dev *dev,
 				   enum cedrus_h264_sram_off off,
 				   const void *data, size_t len)
@@ -156,7 +167,7 @@ static int cedrus_write_frame_list(struct cedrus_ctx *ctx,
 			dma_alloc_attrs(dev->dev,
 					output_buf->codec.h264.mv_col_buf_size,
 					&output_buf->codec.h264.mv_col_buf_dma,
-					GFP_KERNEL, DMA_ATTR_NO_KERNEL_MAPPING);
+					GFP_KERNEL, 0);
 
 		if (!output_buf->codec.h264.mv_col_buf) {
 			output_buf->codec.h264.mv_col_buf_size = 0;
@@ -360,13 +371,31 @@ static void cedrus_set_params(struct cedrus_ctx *ctx,
 	cedrus_write(dev, VE_H264_VLD_OFFSET, 0);
 
 	src_buf_addr = vb2_dma_contig_plane_dma_addr(src_buf, 0);
-	cedrus_write(dev, VE_H264_VLD_END, src_buf_addr + slice_bytes);
+	/*
+	 * On the F101 the end register has to hold the last byte of the whole
+	 * buffer: with the end of the data there the decoder stops after the
+	 * first burst of the stream and leaves the picture unfinished.
+	 */
+	if (cedrus_is_capable(ctx, CEDRUS_CAPABILITY_MODE_INVERTED))
+		cedrus_write(dev, VE_H264_VLD_END,
+			     src_buf_addr + vb2_plane_size(src_buf, 0) - 1);
+	else
+		cedrus_write(dev, VE_H264_VLD_END, src_buf_addr + slice_bytes);
 	cedrus_write(dev, VE_H264_VLD_ADDR,
 		     VE_H264_VLD_ADDR_VAL(src_buf_addr) |
 		     VE_H264_VLD_ADDR_FIRST | VE_H264_VLD_ADDR_VALID |
 		     VE_H264_VLD_ADDR_LAST);
 
-	if (ctx->src_fmt.width > 2048) {
+	if (cedrus_is_capable(ctx, CEDRUS_CAPABILITY_MODE_INVERTED)) {
+		/* engine version 0x11120/0x10210: the line buffers live in memory */
+		cedrus_write(dev, VE_BUF_CTRL,
+			     VE_BUF_CTRL_INTRAPRED_EXT_RAM |
+			     VE_BUF_CTRL_DBLK_EXT_RAM);
+		cedrus_write(dev, VE_DBLK_DRAM_BUF_ADDR,
+			     ctx->codec.h264.deblk_buf_dma);
+		cedrus_write(dev, VE_INTRAPRED_DRAM_BUF_ADDR,
+			     ctx->codec.h264.intra_pred_buf_dma);
+	} else if (cedrus_h264_dram_line_bufs(ctx)) {
 		cedrus_write(dev, VE_BUF_CTRL,
 			     VE_BUF_CTRL_INTRAPRED_MIXED_RAM |
 			     VE_BUF_CTRL_DBLK_MIXED_RAM);
@@ -477,10 +506,13 @@ static void cedrus_set_params(struct cedrus_ctx *ctx,
 	cedrus_write(dev, VE_H264_STATUS, cedrus_read(dev, VE_H264_STATUS));
 
 	// enable int
-	cedrus_write(dev, VE_H264_CTRL,
-		     VE_H264_CTRL_SLICE_DECODE_INT |
-		     VE_H264_CTRL_DECODE_ERR_INT |
-		     VE_H264_CTRL_VLD_DATA_REQ_INT);
+	reg = VE_H264_CTRL_SLICE_DECODE_INT |
+	      VE_H264_CTRL_DECODE_ERR_INT |
+	      VE_H264_CTRL_VLD_DATA_REQ_INT;
+	/* the F101 keeps bit 10 set between the pictures, as its reset value */
+	if (cedrus_is_capable(ctx, CEDRUS_CAPABILITY_MODE_INVERTED))
+		reg |= BIT(10);
+	cedrus_write(dev, VE_H264_CTRL, reg);
 }
 
 static enum cedrus_irq_status
@@ -516,12 +548,41 @@ static void cedrus_h264_irq_disable(struct cedrus_ctx *ctx)
 		     reg & ~VE_H264_CTRL_INT_MASK);
 }
 
+/*
+ * The F101 vendor code resets the engine at the start of every picture and
+ * puts the output side registers (tiled output, line buffer selection) back
+ * to their idle values before it sets the picture up.
+ */
+static void cedrus_h264_f101_reset(struct cedrus_ctx *ctx)
+{
+	struct cedrus_dev *dev = ctx->dev;
+	u32 mode = cedrus_read(dev, VE_MODE);
+
+	cedrus_write(dev, VE_MODE, (mode & ~0xf) | VE_MODE_DISABLED);
+	cedrus_write(dev, 0x04, cedrus_read(dev, 0x04) | BIT(16));
+	cedrus_write(dev, 0x04, cedrus_read(dev, 0x04) & ~BIT(16));
+	cedrus_write(dev, VE_MODE, mode);
+	cedrus_write(dev, 0x1c, cedrus_read(dev, 0x1c) & ~(BIT(8) | BIT(10)));
+	cedrus_write(dev, 0xc4, 0);
+	cedrus_write(dev, 0xc8, 0);
+	cedrus_write(dev, VE_CHROMA_BUF_LEN, 0);
+	cedrus_write(dev, VE_PRIMARY_OUT_FMT,
+		     cedrus_read(dev, VE_PRIMARY_OUT_FMT) & ~0x77);
+	cedrus_write(dev, VE_BUF_CTRL, cedrus_read(dev, VE_BUF_CTRL) & ~0xf);
+	cedrus_write(dev, VE_DBLK_DRAM_BUF_ADDR, 0);
+	cedrus_write(dev, VE_H264_CTRL, 0x400);
+	cedrus_write(dev, VE_H264_CUR_MB_NUM, 0);
+	cedrus_write(dev, VE_H264_MB_ADDR, 0);
+}
+
 static int cedrus_h264_setup(struct cedrus_ctx *ctx, struct cedrus_run *run)
 {
 	struct cedrus_dev *dev = ctx->dev;
 	int ret;
 
 	cedrus_engine_enable(ctx);
+	if (cedrus_is_capable(ctx, CEDRUS_CAPABILITY_MODE_INVERTED))
+		cedrus_h264_f101_reset(ctx);
 
 	cedrus_write(dev, VE_H264_SDROT_CTRL, 0);
 	cedrus_write(dev, VE_H264_EXTRA_BUFFER1,
@@ -546,8 +607,9 @@ static int cedrus_h264_start(struct cedrus_ctx *ctx)
 	int ret;
 
 	/*
-	 * NOTE: All buffers allocated here are only used by HW, so we
-	 * can add DMA_ATTR_NO_KERNEL_MAPPING flag when allocating them.
+	 * NOTE: All buffers allocated here are only used by HW. They are
+	 * mapped on purpose: without a kernel mapping the memory is not
+	 * cleared, and the F101 decoder wants its line buffers zeroed.
 	 */
 
 	/* Formula for picture buffer size is taken from CedarX source. */
@@ -570,7 +632,7 @@ static int cedrus_h264_start(struct cedrus_ctx *ctx)
 	ctx->codec.h264.pic_info_buf =
 		dma_alloc_attrs(dev->dev, ctx->codec.h264.pic_info_buf_size,
 				&ctx->codec.h264.pic_info_buf_dma,
-				GFP_KERNEL, DMA_ATTR_NO_KERNEL_MAPPING);
+				GFP_KERNEL, 0);
 	if (!ctx->codec.h264.pic_info_buf)
 		return -ENOMEM;
 
@@ -584,13 +646,13 @@ static int cedrus_h264_start(struct cedrus_ctx *ctx)
 	ctx->codec.h264.neighbor_info_buf =
 		dma_alloc_attrs(dev->dev, CEDRUS_NEIGHBOR_INFO_BUF_SIZE,
 				&ctx->codec.h264.neighbor_info_buf_dma,
-				GFP_KERNEL, DMA_ATTR_NO_KERNEL_MAPPING);
+				GFP_KERNEL, 0);
 	if (!ctx->codec.h264.neighbor_info_buf) {
 		ret = -ENOMEM;
 		goto err_pic_buf;
 	}
 
-	if (ctx->src_fmt.width > 2048) {
+	if (cedrus_h264_dram_line_bufs(ctx)) {
 		/*
 		 * Formulas for deblock and intra prediction buffer sizes
 		 * are taken from CedarX source.
@@ -598,11 +660,15 @@ static int cedrus_h264_start(struct cedrus_ctx *ctx)
 
 		ctx->codec.h264.deblk_buf_size =
 			ALIGN(ctx->src_fmt.width, 32) * 12;
+		/* size of the vendor driver of the F101 */
+		if (cedrus_is_capable(ctx, CEDRUS_CAPABILITY_MODE_INVERTED))
+			ctx->codec.h264.deblk_buf_size =
+				DIV_ROUND_UP(ctx->src_fmt.width, 16) * 1024;
 		ctx->codec.h264.deblk_buf =
 			dma_alloc_attrs(dev->dev,
 					ctx->codec.h264.deblk_buf_size,
 					&ctx->codec.h264.deblk_buf_dma,
-					GFP_KERNEL, DMA_ATTR_NO_KERNEL_MAPPING);
+					GFP_KERNEL, 0);
 		if (!ctx->codec.h264.deblk_buf) {
 			ret = -ENOMEM;
 			goto err_neighbor_buf;
@@ -614,11 +680,16 @@ static int cedrus_h264_start(struct cedrus_ctx *ctx)
 		 */
 		ctx->codec.h264.intra_pred_buf_size =
 			ALIGN(ctx->src_fmt.width, 64) * 5 * 2;
+
+		/* size of the vendor driver of the F101 */
+		if (cedrus_is_capable(ctx, CEDRUS_CAPABILITY_MODE_INVERTED))
+			ctx->codec.h264.intra_pred_buf_size = SZ_16K +
+				DIV_ROUND_UP(ctx->src_fmt.width, 16) * 546;
 		ctx->codec.h264.intra_pred_buf =
 			dma_alloc_attrs(dev->dev,
 					ctx->codec.h264.intra_pred_buf_size,
 					&ctx->codec.h264.intra_pred_buf_dma,
-					GFP_KERNEL, DMA_ATTR_NO_KERNEL_MAPPING);
+					GFP_KERNEL, 0);
 		if (!ctx->codec.h264.intra_pred_buf) {
 			ret = -ENOMEM;
 			goto err_deblk_buf;
@@ -631,19 +702,19 @@ err_deblk_buf:
 	dma_free_attrs(dev->dev, ctx->codec.h264.deblk_buf_size,
 		       ctx->codec.h264.deblk_buf,
 		       ctx->codec.h264.deblk_buf_dma,
-		       DMA_ATTR_NO_KERNEL_MAPPING);
+		       0);
 
 err_neighbor_buf:
 	dma_free_attrs(dev->dev, CEDRUS_NEIGHBOR_INFO_BUF_SIZE,
 		       ctx->codec.h264.neighbor_info_buf,
 		       ctx->codec.h264.neighbor_info_buf_dma,
-		       DMA_ATTR_NO_KERNEL_MAPPING);
+		       0);
 
 err_pic_buf:
 	dma_free_attrs(dev->dev, ctx->codec.h264.pic_info_buf_size,
 		       ctx->codec.h264.pic_info_buf,
 		       ctx->codec.h264.pic_info_buf_dma,
-		       DMA_ATTR_NO_KERNEL_MAPPING);
+		       0);
 	return ret;
 }
 
@@ -669,7 +740,7 @@ static void cedrus_h264_stop(struct cedrus_ctx *ctx)
 				       buf->codec.h264.mv_col_buf_size,
 				       buf->codec.h264.mv_col_buf,
 				       buf->codec.h264.mv_col_buf_dma,
-				       DMA_ATTR_NO_KERNEL_MAPPING);
+				       0);
 
 			buf->codec.h264.mv_col_buf_size = 0;
 		}
@@ -678,26 +749,29 @@ static void cedrus_h264_stop(struct cedrus_ctx *ctx)
 	dma_free_attrs(dev->dev, CEDRUS_NEIGHBOR_INFO_BUF_SIZE,
 		       ctx->codec.h264.neighbor_info_buf,
 		       ctx->codec.h264.neighbor_info_buf_dma,
-		       DMA_ATTR_NO_KERNEL_MAPPING);
+		       0);
 	dma_free_attrs(dev->dev, ctx->codec.h264.pic_info_buf_size,
 		       ctx->codec.h264.pic_info_buf,
 		       ctx->codec.h264.pic_info_buf_dma,
-		       DMA_ATTR_NO_KERNEL_MAPPING);
+		       0);
 	if (ctx->codec.h264.deblk_buf_size)
 		dma_free_attrs(dev->dev, ctx->codec.h264.deblk_buf_size,
 			       ctx->codec.h264.deblk_buf,
 			       ctx->codec.h264.deblk_buf_dma,
-			       DMA_ATTR_NO_KERNEL_MAPPING);
+			       0);
 	if (ctx->codec.h264.intra_pred_buf_size)
 		dma_free_attrs(dev->dev, ctx->codec.h264.intra_pred_buf_size,
 			       ctx->codec.h264.intra_pred_buf,
 			       ctx->codec.h264.intra_pred_buf_dma,
-			       DMA_ATTR_NO_KERNEL_MAPPING);
+			       0);
 }
 
 static void cedrus_h264_trigger(struct cedrus_ctx *ctx)
 {
 	struct cedrus_dev *dev = ctx->dev;
+
+	if (cedrus_is_capable(ctx, CEDRUS_CAPABILITY_MODE_INVERTED))
+		cedrus_write(dev, 0x1c, cedrus_read(dev, 0x1c) | 0x40);
 
 	cedrus_write(dev, VE_H264_TRIGGER_TYPE,
 		     VE_H264_TRIGGER_TYPE_AVC_SLICE_DECODE);

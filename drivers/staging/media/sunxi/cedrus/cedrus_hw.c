@@ -125,6 +125,9 @@ void cedrus_dst_format_set(struct cedrus_dev *dev,
 		break;
 	case V4L2_PIX_FMT_NV12_32L32:
 	default:
+		/* the F101 keeps the tiled output at the reset value of the registers */
+		if (dev->capabilities & CEDRUS_CAPABILITY_MODE_INVERTED)
+			break;
 		reg = VE_PRIMARY_OUT_FMT_TILED_32_NV12;
 		cedrus_write(dev, VE_PRIMARY_OUT_FMT, reg);
 
