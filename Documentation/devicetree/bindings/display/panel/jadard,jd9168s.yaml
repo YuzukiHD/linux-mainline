@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: GPL-2.0-only OR BSD-2-Clause
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/display/panel/jadard,jd9168s.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Jadard JD9168S based MIPI DSI panel
+
+maintainers:
+  - Yuzuki Tsuru <gloomyghost@gloomyghost.com>
+
+description:
+  A 1024x768 MIPI DSI panel with a Jadard JD9168S controller, on four lanes.
+
+allOf:
+  - $ref: panel-common.yaml#
+
+properties:
+  compatible:
+    const: jadard,jd9168s
+
+  reg:
+    maxItems: 1
+
+  reset-gpios: true
+  backlight: true
+
+required:
+  - compatible
+  - reg
+  - reset-gpios
+
+additionalProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/gpio/gpio.h>
+
+    dsi {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        panel@0 {
+            compatible = "jadard,jd9168s";
+            reg = <0>;
+            reset-gpios = <&pio 3 9 GPIO_ACTIVE_LOW>;
+            backlight = <&backlight>;
+        };
+    };
+...

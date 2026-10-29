@@ -319,6 +319,15 @@ config DRM_PANEL_ILITEK_ILI9806E_SPI
 	  Say Y if you want to enable support for panels based on the
 	  Ilitek ILI9806E controller using SPI.
 
+config DRM_PANEL_JADARD_JD9168S
+	tristate "Jadard JD9168S based 1024x768 MIPI DSI panel"
+	depends on OF
+	depends on DRM_MIPI_DSI
+	depends on BACKLIGHT_CLASS_DEVICE
+	help
+	  Say Y here if you want to enable support for the 1024x768 MIPI DSI
+	  panel with a Jadard JD9168S controller, as on the Yuzukineko board.
+
 config DRM_PANEL_ILITEK_ILI9881C
 	tristate "Ilitek ILI9881C-based panels"
 	depends on OF
