@@ -18,6 +18,10 @@
 struct sun8i_tcon_top_quirks {
 	bool has_tcon_tv1;
 	bool has_dsi;
+	/* the DSI clock gate has to stay open, nothing else would open it */
+	bool dsi_gate_on;
+	/* the LCD controller takes its pixel clock from the D-PHY */
+	bool clk_from_phy;
 };
 
 static bool sun8i_tcon_top_node_is_tcon_top(struct device_node *node)
@@ -98,7 +102,8 @@ static struct clk_hw *sun8i_tcon_top_register_gate(struct device *dev,
 						   const char *parent,
 						   void __iomem *regs,
 						   spinlock_t *lock,
-						   u8 bit, int name_index)
+						   u8 bit, int name_index,
+						   unsigned long flags)
 {
 	const char *clk_name, *parent_name;
 	int ret, index;
@@ -116,7 +121,7 @@ static struct clk_hw *sun8i_tcon_top_register_gate(struct device *dev,
 		return ERR_PTR(ret);
 
 	return clk_hw_register_gate(dev, clk_name, parent_name,
-				    CLK_SET_RATE_PARENT,
+				    CLK_SET_RATE_PARENT | flags,
 				    regs + TCON_TOP_GATE_SRC_REG,
 				    bit, 0, lock);
 };
@@ -182,6 +187,11 @@ static int sun8i_tcon_top_bind(struct device *dev, struct device *master,
 	writel(0, regs + TCON_TOP_PORT_SEL_REG);
 	writel(0, regs + TCON_TOP_GATE_SRC_REG);
 
+	/* The LCD controller gets its pixel clock from the D-PHY PLL */
+	if (quirks->clk_from_phy)
+		writel(TCON_TOP_CLK_SRC_LCD0_PHY | TCON_TOP_CLK_SRC_PHY0,
+		       regs + TCON_TOP_CLK_SRC_REG);
+
 	/*
 	 * TCON TOP has two muxes, which select parent clock for each TCON TV
 	 * channel clock. Parent could be either TCON TV or TVE clock. For now
@@ -194,19 +204,20 @@ static int sun8i_tcon_top_bind(struct device *dev, struct device *master,
 	clk_data->hws[CLK_TCON_TOP_TV0] =
 		sun8i_tcon_top_register_gate(dev, "tcon-tv0", regs,
 					     &tcon_top->reg_lock,
-					     TCON_TOP_TCON_TV0_GATE, i++);
+					     TCON_TOP_TCON_TV0_GATE, i++, 0);
 
 	if (quirks->has_tcon_tv1)
 		clk_data->hws[CLK_TCON_TOP_TV1] =
 			sun8i_tcon_top_register_gate(dev, "tcon-tv1", regs,
 						     &tcon_top->reg_lock,
-						     TCON_TOP_TCON_TV1_GATE, i++);
+						     TCON_TOP_TCON_TV1_GATE, i++, 0);
 
 	if (quirks->has_dsi)
 		clk_data->hws[CLK_TCON_TOP_DSI] =
 			sun8i_tcon_top_register_gate(dev, "dsi", regs,
 						     &tcon_top->reg_lock,
-						     TCON_TOP_TCON_DSI_GATE, i++);
+						     TCON_TOP_TCON_DSI_GATE, i++,
+						     quirks->dsi_gate_on ? CLK_IS_CRITICAL : 0);
 
 	for (i = 0; i < CLK_NUM; i++)
 		if (IS_ERR(clk_data->hws[i])) {
@@ -274,6 +285,12 @@ static const struct sun8i_tcon_top_quirks sun20i_d1_tcon_top_quirks = {
 	.has_dsi	= true,
 };
 
+static const struct sun8i_tcon_top_quirks sun252i_f101_tcon_top_quirks = {
+	.has_dsi	= true,
+	.dsi_gate_on	= true,
+	.clk_from_phy	= true,
+};
+
 static const struct sun8i_tcon_top_quirks sun50i_h6_tcon_top_quirks = {
 	/* Nothing special */
 };
@@ -287,6 +304,10 @@ const struct of_device_id sun8i_tcon_top_of_table[] = {
 	{
 		.compatible = "allwinner,sun20i-d1-tcon-top",
 		.data = &sun20i_d1_tcon_top_quirks
+	},
+	{
+		.compatible = "allwinner,sun252i-f101-tcon-top",
+		.data = &sun252i_f101_tcon_top_quirks
 	},
 	{
 		.compatible = "allwinner,sun50i-h6-tcon-top",

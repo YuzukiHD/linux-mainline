@@ -11,6 +11,11 @@
 
 #define TCON_TOP_TCON_TV_SETUP_REG	0x00
 
+/* F101: where the pixel clock of the LCD controller comes from */
+#define TCON_TOP_CLK_SRC_REG		0x0c
+#define TCON_TOP_CLK_SRC_LCD0_PHY		BIT(0)
+#define TCON_TOP_CLK_SRC_PHY0			BIT(4)
+
 #define TCON_TOP_PORT_SEL_REG		0x1C
 #define TCON_TOP_PORT_DE0_MSK			GENMASK(1, 0)
 #define TCON_TOP_PORT_DE1_MSK			GENMASK(5, 4)
