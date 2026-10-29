@@ -1,0 +1,77 @@
+# SPDX-License-Identifier: GPL-2.0
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/spi/allwinner,sun252i-f101-spif.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Allwinner F101 SPI Flash Controller
+
+description:
+  A controller dedicated to SPI flashes. It shares the pads of the SPI0
+  controller. A flash command, with its address, dummy and data phases, is
+  one descriptor fetched by the controller's own DMA.
+
+allOf:
+  - $ref: spi-controller.yaml
+
+maintainers:
+  - Yuzuki Tsuru <gloomyghost@gloomyghost.com>
+
+properties:
+  compatible:
+    const: allwinner,sun252i-f101-spif
+
+  reg:
+    maxItems: 1
+
+  clocks:
+    items:
+      - description: Bus Clock
+      - description: Module Clock
+
+  clock-names:
+    items:
+      - const: ahb
+      - const: mod
+
+  resets:
+    maxItems: 1
+
+  allwinner,tune-offset:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    description:
+      Offset in the flash of a 4 KiB place that reads the same on every try
+      and is not blank. Over 50 MHz the controller samples the data at a
+      point that depends on the board; with this property it is found the
+      first time a bulk read runs at that speed, by comparing the reads at
+      each point with the same read at 24 MHz. Without it the controller
+      does not go over 50 MHz.
+
+required:
+  - compatible
+  - reg
+  - clocks
+  - clock-names
+  - resets
+
+unevaluatedProperties: false
+
+examples:
+  - |
+    spi@c000000 {
+        compatible = "allwinner,sun252i-f101-spif";
+        reg = <0x0c000000 0x1000>;
+        clocks = <&ccu 57>, <&ccu 56>;
+        clock-names = "ahb", "mod";
+        resets = <&ccu 28>;
+        allwinner,tune-offset = <0x6d1000>;
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        flash@0 {
+            compatible = "jedec,spi-nor";
+            reg = <0>;
+            spi-max-frequency = <100000000>;
+            spi-rx-bus-width = <4>;
+        };
+    };
