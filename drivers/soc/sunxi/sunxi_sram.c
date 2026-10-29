@@ -102,6 +102,16 @@ static struct sunxi_sram_desc sun252i_f101_de_sram = {
 				  SUNXI_SRAM_MAP(5, 1, "de")),
 };
 
+/*
+ * The FIFO RAM of the OTG controller is in the same area, the bits must be
+ * clear for it. The display engine wants them set (see above).
+ */
+static struct sunxi_sram_desc sun252i_f101_usb_sram = {
+	.data	= SUNXI_SRAM_DATA("USB", 0x4, 25, 3,
+				  SUNXI_SRAM_MAP(0, 0, "cpu"),
+				  SUNXI_SRAM_MAP(0, 1, "usb")),
+};
+
 static const struct of_device_id sunxi_sram_dt_ids[] = {
 	{
 		.compatible	= "allwinner,sun4i-a10-sram-a3-a4",
@@ -130,6 +140,10 @@ static const struct of_device_id sunxi_sram_dt_ids[] = {
 	{
 		.compatible	= "allwinner,sun252i-f101-sram-de",
 		.data		= &sun252i_f101_de_sram.data,
+	},
+	{
+		.compatible	= "allwinner,sun252i-f101-sram-usb",
+		.data		= &sun252i_f101_usb_sram.data,
 	},
 	{}
 };

@@ -833,6 +833,13 @@ static const struct sunxi_musb_cfg sun8i_h3_musb_cfg = {
 	.no_configdata = true,
 };
 
+static const struct sunxi_musb_cfg sun252i_f101_musb_cfg = {
+	.hdrc_config = &sunxi_musb_hdrc_config_5eps,
+	.has_sram = true,
+	.has_reset = true,
+	.no_configdata = true,
+};
+
 static const struct sunxi_musb_cfg suniv_f1c100s_musb_cfg = {
 	.hdrc_config = &sunxi_musb_hdrc_config_5eps,
 	.has_sram = true,
@@ -845,6 +852,8 @@ static const struct of_device_id sunxi_musb_match[] = {
 	  .data = &sun4i_a10_musb_cfg, },
 	{ .compatible = "allwinner,sun6i-a31-musb",
 	  .data = &sun6i_a31_musb_cfg, },
+	{ .compatible = "allwinner,sun252i-f101-musb",
+	  .data = &sun252i_f101_musb_cfg, },
 	{ .compatible = "allwinner,sun8i-a33-musb",
 	  .data = &sun8i_a33_musb_cfg, },
 	{ .compatible = "allwinner,sun8i-h3-musb",
