@@ -158,6 +158,59 @@
 			};
 		};
 
+		usb_otg: usb@4100000 {
+			compatible = "allwinner,sun252i-f101-musb";
+			reg = <0x0 0x04100000 0x0 0x400>;
+			interrupts-extended = <&plic 29 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "mc";
+			clocks = <&ccu CLK_BUS_USBOTG0>;
+			resets = <&ccu RST_USB_OTG0>;
+			extcon = <&usbphy 0>;
+			phys = <&usbphy 0>;
+			phy-names = "usb";
+			allwinner,sram = <&usb_sram_section 1>;
+			status = "disabled";
+		};
+
+		usbphy: phy@4100400 {
+			compatible = "allwinner,sun20i-d1-usb-phy";
+			reg = <0x0 0x04100400 0x0 0x100>,
+			      <0x0 0x04101800 0x0 0x100>;
+			reg-names = "phy_ctrl", "pmu0";
+			clocks = <&osc24M>;
+			clock-names = "usb0_phy";
+			resets = <&ccu RST_USB_PHY0_RSTN>;
+			reset-names = "usb0_reset";
+			#phy-cells = <1>;
+			status = "disabled";
+		};
+
+		ehci0: usb@4101000 {
+			compatible = "allwinner,sun20i-d1-ehci", "generic-ehci";
+			reg = <0x0 0x04101000 0x0 0x100>;
+			interrupts-extended = <&plic 30 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&ccu CLK_BUS_USBOHCI0>,
+				 <&ccu CLK_BUS_USBEHCI0>,
+				 <&ccu CLK_BUS_USB>;
+			resets = <&ccu RST_USB_OHCI0>,
+				 <&ccu RST_USB_EHCI0>;
+			phys = <&usbphy 0>;
+			phy-names = "usb";
+			status = "disabled";
+		};
+
+		ohci0: usb@4101400 {
+			compatible = "allwinner,sun20i-d1-ohci", "generic-ohci";
+			reg = <0x0 0x04101400 0x0 0x100>;
+			interrupts-extended = <&plic 31 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&ccu CLK_BUS_USBOHCI0>,
+				 <&ccu CLK_BUS_USB>;
+			resets = <&ccu RST_USB_OHCI0>;
+			phys = <&usbphy 0>;
+			phy-names = "usb";
+			status = "disabled";
+		};
+
 		g2d: g2d@5410000 {
 			compatible = "allwinner,sun252i-f101-g2d";
 			reg = <0x0 0x05410000 0x0 0x40000>;
@@ -177,6 +230,10 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			status = "disabled";
+		};
+
+		usb_sram_section: sram-section-usb {
+			compatible = "allwinner,sun252i-f101-sram-usb";
 		};
 
 		de_sram_section: sram-section-de {

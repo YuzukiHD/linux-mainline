@@ -118,6 +118,28 @@
 	};
 };
 
+/*
+ * One PHY serves the OTG controller and the EHCI/OHCI pair. The board has no
+ * ID or VBUS detection, so the role is chosen by hand: it starts as a device,
+ * "echo host > /sys/.../4100000.usb/mode" switches the PHY to the host side.
+ */
+&usbphy {
+	status = "okay";
+};
+
+&usb_otg {
+	dr_mode = "otg";
+	status = "okay";
+};
+
+&ehci0 {
+	status = "okay";
+};
+
+&ohci0 {
+	status = "okay";
+};
+
 &g2d {
 	status = "okay";
 };
