@@ -30,6 +30,9 @@ properties:
               - allwinner,sun50i-r329-spi-dbi
           - const: allwinner,sun50i-r329-spi
       - items:
+          - const: allwinner,sun252i-f101-spi
+          - const: allwinner,sun50i-r329-spi
+      - items:
           - const: allwinner,sun20i-d1-spi-dbi
           - const: allwinner,sun50i-r329-spi-dbi
           - const: allwinner,sun50i-r329-spi
