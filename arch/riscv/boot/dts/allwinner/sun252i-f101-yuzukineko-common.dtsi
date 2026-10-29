@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only OR MIT
 /dts-v1/;
 
+#include <dt-bindings/memory/sun252i-f101-mbus.h>
 #include <dt-bindings/pwm/pwm.h>
 
 #include "sun252i-f101.dtsi"
@@ -114,5 +115,20 @@
 		pwms = <&pwm0 2 1000000 PWM_POLARITY_INVERTED>;
 		brightness-levels = <0 4 8 16 32 64 96 128 160 192 224 255>;
 		default-brightness-level = <6>;
+	};
+};
+
+/* The display engine at the top priority, the CPU capped so it cannot starve it */
+&mbus {
+	status = "okay";
+
+	display-engine@10 {
+		reg = <SUN252I_F101_MBUS_MASTER_DE>;
+		priority = <3>;
+	};
+
+	cpu@27 {
+		reg = <SUN252I_F101_MBUS_MASTER_RISCV>;
+		bandwidth-limit-mbps = <500>;
 	};
 };

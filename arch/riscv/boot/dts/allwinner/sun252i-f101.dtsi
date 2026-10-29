@@ -158,6 +158,17 @@
 			};
 		};
 
+		mbus: mbus@3102000 {
+			compatible = "allwinner,sun252i-f101-mbus";
+			reg = <0x0 0x03102000 0x0 0x1000>;
+			clocks = <&ccu CLK_BUS_DRAM>, <&ccu CLK_MBUS>;
+			clock-names = "bus", "mbus";
+			resets = <&ccu RST_BUS_DRAM>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "disabled";
+		};
+
 		de_sram_section: sram-section-de {
 			compatible = "allwinner,sun252i-f101-sram-de";
 		};

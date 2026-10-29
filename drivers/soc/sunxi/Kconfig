@@ -19,3 +19,11 @@ config SUNXI_SRAM
 	  Say y here to enable the SRAM controller support. This
 	  device is responsible on mapping the SRAM in the sunXi SoCs
 	  whether to the CPU/DMA, or to the devices.
+
+config SUN252I_F101_MBUS
+	tristate "Allwinner F101 memory bus arbitration"
+	depends on ARCH_SUNXI || COMPILE_TEST
+	help
+	  Say y here to set the priority and the bandwidth limit of the bus
+	  masters of the memory bus of the Allwinner F101 from the devicetree,
+	  and to have its traffic counters in debugfs.
