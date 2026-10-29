@@ -138,6 +138,57 @@ void cedrus_dst_format_set(struct cedrus_dev *dev,
 	}
 }
 
+/* Conversion block: tiled picture (chroma at width * height) to linear NV12 */
+#define CV_SIZE		0xa00
+#define CV_STRIDE	0xa04
+#define CV_ENABLE	0xa08
+#define CV_MODE		0xa0c
+#define CV_STATUS	0xa10
+#define CV_LINE		0xa14
+#define CV_CONFIG	0xa2c
+#define CV_OUT_Y	0xa70
+#define CV_OUT_C	0xa74
+#define CV_IN_Y		0xa78
+#define CV_IN_C		0xa7c
+#define CV_TOP_MODE	2
+
+void cedrus_convert_start(struct cedrus_dev *dev, u32 width, u32 height,
+			  dma_addr_t in, dma_addr_t out)
+{
+	u32 mbw = width / 16;
+	u32 mbh = height / 16;
+
+	cedrus_write(dev, 0x04, 1);
+	cedrus_write(dev, 0x04, 0);
+	cedrus_write(dev, VE_MODE, CV_TOP_MODE);
+	cedrus_write(dev, CV_STATUS, 1);
+	cedrus_write(dev, CV_SIZE, (mbw << 16) | mbh);
+	cedrus_write(dev, CV_STRIDE, (mbw << 16) | mbw);
+	cedrus_write(dev, CV_LINE, mbw);
+	cedrus_write(dev, CV_ENABLE, 0x50080001);
+	cedrus_write(dev, CV_CONFIG, (mbh << 16) | mbw);
+	cedrus_write(dev, 0xa30, 0);
+	cedrus_write(dev, 0xa34, 0);
+	cedrus_write(dev, 0xa38, 0);
+	cedrus_write(dev, CV_OUT_Y, out);
+	cedrus_write(dev, CV_OUT_C, out + width * height);
+	cedrus_write(dev, CV_IN_Y, in);
+	cedrus_write(dev, CV_IN_C, in + width * height);
+	cedrus_write(dev, CV_MODE, 1);
+}
+
+bool cedrus_convert_done(struct cedrus_dev *dev)
+{
+	return (cedrus_read(dev, CV_ENABLE) & 1) &&
+	       (cedrus_read(dev, CV_STATUS) & 1);
+}
+
+void cedrus_convert_clear(struct cedrus_dev *dev)
+{
+	cedrus_write(dev, CV_ENABLE, cedrus_read(dev, CV_ENABLE) & ~1);
+	cedrus_write(dev, CV_STATUS, 1);
+}
+
 static irqreturn_t cedrus_irq(int irq, void *data)
 {
 	struct cedrus_dev *dev = data;

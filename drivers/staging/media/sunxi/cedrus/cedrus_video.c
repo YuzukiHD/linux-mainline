@@ -99,7 +99,7 @@ static bool cedrus_format_usable(struct cedrus_ctx *ctx, struct cedrus_format *f
 		return false;
 
 	if ((directions & CEDRUS_DECODE_DST) &&
-	    ctx->src_fmt.pixelformat == V4L2_PIX_FMT_JPEG)
+	    cedrus_cap_converted(ctx))
 		return fmt->pixelformat == V4L2_PIX_FMT_NV12;
 
 	return cedrus_is_capable(ctx, fmt->capabilities);
@@ -286,7 +286,7 @@ static int cedrus_try_fmt_vid_cap_p(struct cedrus_ctx *ctx,
 	 * The conversion block works on macroblocks of 32x32 pixels; the
 	 * visible part is told by the compose rectangle.
 	 */
-	if (ctx->src_fmt.pixelformat == V4L2_PIX_FMT_JPEG) {
+	if (cedrus_cap_converted(ctx)) {
 		pix_fmt->bytesperline = ALIGN(ctx->src_fmt.width, 32);
 		pix_fmt->width = pix_fmt->bytesperline;
 		pix_fmt->height = ALIGN(ctx->src_fmt.height, 32);

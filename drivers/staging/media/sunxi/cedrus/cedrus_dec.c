@@ -93,7 +93,7 @@ void cedrus_device_run(void *priv)
 	v4l2_m2m_buf_copy_metadata(run.src, run.dst);
 
 	/* the JPEG decoder makes linear NV12 with its conversion block */
-	if (ctx->src_fmt.pixelformat != V4L2_PIX_FMT_JPEG)
+	if (!cedrus_cap_converted(ctx))
 		cedrus_dst_format_set(dev, &ctx->dst_fmt);
 
 	error = ctx->current_codec->setup(ctx, &run);

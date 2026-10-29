@@ -52,6 +52,30 @@ static bool cedrus_h264_dram_line_bufs(struct cedrus_ctx *ctx)
 	       cedrus_is_capable(ctx, CEDRUS_CAPABILITY_MODE_INVERTED);
 }
 
+/* Tiled picture the F101 decodes into before it is made linear NV12 */
+static int cedrus_h264_tile_alloc(struct cedrus_ctx *ctx,
+				  struct cedrus_buffer *buf)
+{
+	u32 width = ALIGN(ctx->src_fmt.width, 32);
+	u32 height = ALIGN(ctx->src_fmt.height, 32);
+
+	if (buf->codec.h264.tile)
+		return 0;
+
+	buf->codec.h264.tile_size = width * height +
+				    width * ALIGN(height, 64) / 2;
+	buf->codec.h264.tile = dma_alloc_attrs(ctx->dev->dev,
+					       buf->codec.h264.tile_size,
+					       &buf->codec.h264.tile_dma,
+					       GFP_KERNEL, 0);
+	if (!buf->codec.h264.tile) {
+		buf->codec.h264.tile_size = 0;
+		return -ENOMEM;
+	}
+
+	return 0;
+}
+
 static void cedrus_h264_write_sram(struct cedrus_dev *dev,
 				   enum cedrus_h264_sram_off off,
 				   const void *data, size_t len)
@@ -88,8 +112,17 @@ static void cedrus_fill_ref_pic(struct cedrus_ctx *ctx,
 	pic->bottom_field_order_cnt = cpu_to_le32(bottom_field_order_cnt);
 	pic->frame_info = cpu_to_le32(buf->codec.h264.pic_type << 8);
 
-	pic->luma_ptr = cpu_to_le32(cedrus_buf_addr(vbuf, &ctx->dst_fmt, 0));
-	pic->chroma_ptr = cpu_to_le32(cedrus_buf_addr(vbuf, &ctx->dst_fmt, 1));
+	if (cedrus_cap_converted(ctx)) {
+		dma_addr_t tile = buf->codec.h264.tile_dma;
+
+		pic->luma_ptr = cpu_to_le32(tile);
+		pic->chroma_ptr = cpu_to_le32(tile +
+					      ALIGN(ctx->src_fmt.width, 32) *
+					      ALIGN(ctx->src_fmt.height, 32));
+	} else {
+		pic->luma_ptr = cpu_to_le32(cedrus_buf_addr(vbuf, &ctx->dst_fmt, 0));
+		pic->chroma_ptr = cpu_to_le32(cedrus_buf_addr(vbuf, &ctx->dst_fmt, 1));
+	}
 	pic->mv_col_top_ptr = cpu_to_le32(cedrus_h264_mv_col_buf_addr(buf, 0));
 	pic->mv_col_bot_ptr = cpu_to_le32(cedrus_h264_mv_col_buf_addr(buf, 1));
 }
@@ -174,6 +207,9 @@ static int cedrus_write_frame_list(struct cedrus_ctx *ctx,
 			return -ENOMEM;
 		}
 	}
+
+	if (cedrus_cap_converted(ctx) && cedrus_h264_tile_alloc(ctx, output_buf))
+		return -ENOMEM;
 
 	if (decode->flags & V4L2_H264_DECODE_PARAM_FLAG_FIELD_PIC)
 		output_buf->codec.h264.pic_type = CEDRUS_H264_PIC_TYPE_FIELD;
@@ -519,14 +555,33 @@ static enum cedrus_irq_status
 cedrus_h264_irq_status(struct cedrus_ctx *ctx)
 {
 	struct cedrus_dev *dev = ctx->dev;
-	u32 reg = cedrus_read(dev, VE_H264_STATUS);
+	u32 reg;
+
+	if (ctx->codec.h264.converting)
+		return cedrus_convert_done(dev) ? CEDRUS_IRQ_OK : CEDRUS_IRQ_NONE;
+
+	reg = cedrus_read(dev, VE_H264_STATUS);
 
 	if (reg & (VE_H264_STATUS_DECODE_ERR_INT |
 		   VE_H264_STATUS_VLD_DATA_REQ_INT))
 		return CEDRUS_IRQ_ERROR;
 
-	if (reg & VE_H264_CTRL_SLICE_DECODE_INT)
-		return CEDRUS_IRQ_OK;
+	if (reg & VE_H264_CTRL_SLICE_DECODE_INT) {
+		if (!ctx->codec.h264.convert)
+			return CEDRUS_IRQ_OK;
+
+		/* the picture is complete: make it linear NV12 */
+		cedrus_write(dev, VE_H264_STATUS, VE_H264_STATUS_INT_MASK);
+		cedrus_write(dev, VE_H264_CTRL,
+			     cedrus_read(dev, VE_H264_CTRL) &
+			     ~VE_H264_CTRL_INT_MASK);
+		ctx->codec.h264.converting = true;
+		cedrus_convert_start(dev, ALIGN(ctx->src_fmt.width, 32),
+				     ALIGN(ctx->src_fmt.height, 32),
+				     ctx->codec.h264.conv_in,
+				     ctx->codec.h264.conv_out);
+		return CEDRUS_IRQ_CONTINUE;
+	}
 
 	return CEDRUS_IRQ_NONE;
 }
@@ -535,6 +590,12 @@ static void cedrus_h264_irq_clear(struct cedrus_ctx *ctx)
 {
 	struct cedrus_dev *dev = ctx->dev;
 
+	if (ctx->codec.h264.converting) {
+		cedrus_convert_clear(dev);
+		ctx->codec.h264.converting = false;
+		return;
+	}
+
 	cedrus_write(dev, VE_H264_STATUS,
 		     VE_H264_STATUS_INT_MASK);
 }
@@ -542,8 +603,12 @@ static void cedrus_h264_irq_clear(struct cedrus_ctx *ctx)
 static void cedrus_h264_irq_disable(struct cedrus_ctx *ctx)
 {
 	struct cedrus_dev *dev = ctx->dev;
-	u32 reg = cedrus_read(dev, VE_H264_CTRL);
+	u32 reg;
 
+	if (ctx->codec.h264.converting)
+		return;
+
+	reg = cedrus_read(dev, VE_H264_CTRL);
 	cedrus_write(dev, VE_H264_CTRL,
 		     reg & ~VE_H264_CTRL_INT_MASK);
 }
@@ -580,6 +645,10 @@ static int cedrus_h264_setup(struct cedrus_ctx *ctx, struct cedrus_run *run)
 	struct cedrus_dev *dev = ctx->dev;
 	int ret;
 
+	ctx->codec.h264.converting = false;
+	ctx->codec.h264.convert = cedrus_cap_converted(ctx) &&
+		!(run->src->flags & V4L2_BUF_FLAG_M2M_HOLD_CAPTURE_BUF);
+
 	cedrus_engine_enable(ctx);
 	if (cedrus_is_capable(ctx, CEDRUS_CAPABILITY_MODE_INVERTED))
 		cedrus_h264_f101_reset(ctx);
@@ -594,6 +663,14 @@ static int cedrus_h264_setup(struct cedrus_ctx *ctx, struct cedrus_run *run)
 	ret = cedrus_write_frame_list(ctx, run);
 	if (ret)
 		return ret;
+
+	if (cedrus_cap_converted(ctx)) {
+		struct cedrus_buffer *out = vb2_to_cedrus_buffer(&run->dst->vb2_buf);
+
+		ctx->codec.h264.conv_in = out->codec.h264.tile_dma;
+		ctx->codec.h264.conv_out =
+			vb2_dma_contig_plane_dma_addr(&run->dst->vb2_buf, 0);
+	}
 
 	cedrus_set_params(ctx, run);
 
@@ -743,6 +820,14 @@ static void cedrus_h264_stop(struct cedrus_ctx *ctx)
 				       0);
 
 			buf->codec.h264.mv_col_buf_size = 0;
+		}
+
+		if (buf->codec.h264.tile_size > 0) {
+			dma_free_attrs(dev->dev, buf->codec.h264.tile_size,
+				       buf->codec.h264.tile,
+				       buf->codec.h264.tile_dma, 0);
+			buf->codec.h264.tile = NULL;
+			buf->codec.h264.tile_size = 0;
 		}
 	}
 

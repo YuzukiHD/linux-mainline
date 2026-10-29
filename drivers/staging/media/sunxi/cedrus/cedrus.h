@@ -108,6 +108,9 @@ struct cedrus_buffer {
 			void				*mv_col_buf;
 			dma_addr_t			mv_col_buf_dma;
 			ssize_t				mv_col_buf_size;
+			void				*tile;
+			dma_addr_t			tile_dma;
+			size_t				tile_size;
 		} h264;
 		struct {
 			void		*mv_col_buf;
@@ -152,6 +155,10 @@ struct cedrus_ctx {
 			void		*intra_pred_buf;
 			dma_addr_t	intra_pred_buf_dma;
 			ssize_t		intra_pred_buf_size;
+			bool		convert;
+			bool		converting;
+			dma_addr_t	conv_in;
+			dma_addr_t	conv_out;
 		} h264;
 		struct {
 			void		*neighbor_info_buf;
@@ -288,6 +295,22 @@ cedrus_is_capable(struct cedrus_ctx *ctx, unsigned int capabilities)
 {
 	return (ctx->dev->capabilities & capabilities) == capabilities;
 }
+
+/*
+ * Pictures that are decoded into tiles and made linear NV12 with the
+ * conversion block of the engine (JPEG, and H.264 on the F101).
+ */
+static inline bool cedrus_cap_converted(struct cedrus_ctx *ctx)
+{
+	return ctx->src_fmt.pixelformat == V4L2_PIX_FMT_JPEG ||
+	       (ctx->src_fmt.pixelformat == V4L2_PIX_FMT_H264_SLICE &&
+		cedrus_is_capable(ctx, CEDRUS_CAPABILITY_MODE_INVERTED));
+}
+
+void cedrus_convert_start(struct cedrus_dev *dev, u32 width, u32 height,
+			  dma_addr_t in, dma_addr_t out);
+bool cedrus_convert_done(struct cedrus_dev *dev);
+void cedrus_convert_clear(struct cedrus_dev *dev);
 
 void *cedrus_find_control_data(struct cedrus_ctx *ctx, u32 id);
 u32 cedrus_get_num_of_controls(struct cedrus_ctx *ctx, u32 id);
