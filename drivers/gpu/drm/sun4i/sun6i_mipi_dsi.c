@@ -766,6 +766,7 @@ static void sun6i_dsi_encoder_enable(struct drm_encoder *encoder)
 					 device->lanes, cfg);
 
 	phy_set_mode(dsi->dphy, PHY_MODE_MIPI_DPHY);
+	phy_set_bus_width(dsi->dphy, mipi_dsi_pixel_format_to_bpp(device->format));
 	phy_configure(dsi->dphy, &opts);
 	phy_power_on(dsi->dphy);
 
@@ -1233,6 +1234,10 @@ static const struct of_device_id sun6i_dsi_of_table[] = {
 	{
 		.compatible	= "allwinner,sun50i-a64-mipi-dsi",
 		.data		= &sun50i_a64_mipi_dsi_variant,
+	},
+	{
+		.compatible	= "allwinner,sun252i-f101-mipi-dsi",
+		.data		= &sun50i_a100_mipi_dsi_variant,
 	},
 	{
 		.compatible	= "allwinner,sun50i-a100-mipi-dsi",

@@ -20,6 +20,9 @@ properties:
       - items:
           - const: allwinner,sun20i-d1-mipi-dsi
           - const: allwinner,sun50i-a100-mipi-dsi
+      - items:
+          - const: allwinner,sun252i-f101-mipi-dsi
+          - const: allwinner,sun50i-a100-mipi-dsi
 
   reg:
     maxItems: 1
