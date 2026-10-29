@@ -18,6 +18,8 @@
 struct sun6i_dsi_variant {
 	bool			has_mod_clk;
 	bool			set_mod_clk;
+	/* fixed start delay of the video data, 0 computes it from the mode */
+	u16			video_start_delay;
 };
 
 struct sun6i_dsi {

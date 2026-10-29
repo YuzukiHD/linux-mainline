@@ -367,6 +367,9 @@ static u16 sun6i_dsi_get_video_start_delay(struct sun6i_dsi *dsi,
 {
 	u16 delay = mode->vtotal - (mode->vsync_start - mode->vdisplay) + 1;
 
+	if (dsi->variant->video_start_delay)
+		return dsi->variant->video_start_delay;
+
 	if (delay > mode->vtotal)
 		delay = delay % mode->vtotal;
 
@@ -1226,6 +1229,16 @@ static const struct sun6i_dsi_variant sun50i_a100_mipi_dsi_variant = {
 	.has_mod_clk	= true,
 };
 
+/*
+ * The TCON of the F101 triggers the frame itself, so the DSI host starts the
+ * video data right after it: a start delay computed from the mode moves the
+ * picture down and leaves the first lines empty.
+ */
+static const struct sun6i_dsi_variant sun252i_f101_mipi_dsi_variant = {
+	.has_mod_clk		= true,
+	.video_start_delay	= 1,
+};
+
 static const struct of_device_id sun6i_dsi_of_table[] = {
 	{
 		.compatible	= "allwinner,sun6i-a31-mipi-dsi",
@@ -1237,7 +1250,7 @@ static const struct of_device_id sun6i_dsi_of_table[] = {
 	},
 	{
 		.compatible	= "allwinner,sun252i-f101-mipi-dsi",
-		.data		= &sun50i_a100_mipi_dsi_variant,
+		.data		= &sun252i_f101_mipi_dsi_variant,
 	},
 	{
 		.compatible	= "allwinner,sun50i-a100-mipi-dsi",
