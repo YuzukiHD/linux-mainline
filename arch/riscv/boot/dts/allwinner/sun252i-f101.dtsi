@@ -158,6 +158,10 @@
 			};
 		};
 
+		de_sram_section: sram-section-de {
+			compatible = "allwinner,sun252i-f101-sram-de";
+		};
+
 		pwm0: pwm@2000c00 {
 			compatible = "allwinner,sunxi-pwm-v201",
 				     "allwinner,sun252i-f101-pwm";
@@ -221,6 +225,18 @@
 			spi0_pc_pins: spi0-pc-pins {
 				pins = "PC0", "PC1", "PC2", "PC3", "PC4", "PC5";
 				function = "spi0";
+			};
+
+			dsi_pd_pins: dsi-pd-pins {
+				pins = "PD12", "PD13", "PD14", "PD15", "PD16",
+				       "PD17", "PD18", "PD19", "PD20", "PD21";
+				function = "dsi";
+				drive-strength = <30>;
+			};
+
+			pwm0_pd22_pin: pwm0-pd22-pin {
+				pins = "PD22";
+				function = "pwm0_2";
 			};
 
 			spif0_pc_pins: spif0-pc-pins {
@@ -461,6 +477,154 @@
 				 <&ccu CLK_SPIF>;
 			clock-names = "ahb", "mod";
 			resets = <&ccu RST_BUS_SPIF>;
+			status = "disabled";
+		};
+
+		de: display-engine {
+			compatible = "allwinner,sun20i-d1-display-engine";
+			allwinner,pipelines = <&mixer0>;
+			status = "disabled";
+		};
+
+		mixer0: mixer@5100000 {
+			compatible = "allwinner,sun252i-f101-de33-mixer-0";
+			reg = <0x0 0x05100000 0x0 0xc0000>,
+			      <0x0 0x05000000 0x0 0x1000>,
+			      <0x0 0x051c0000 0x0 0x40000>;
+			reg-names = "layers", "top", "display";
+			clocks = <&ccu CLK_BUS_DE>, <&ccu CLK_DE>;
+			clock-names = "bus", "mod";
+			resets = <&ccu RST_BUS_DE>;
+			allwinner,sram = <&de_sram_section 1>;
+			status = "disabled";
+
+			ports {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				mixer0_out: port@1 {
+					reg = <1>;
+
+					mixer0_out_tcon_top_mixer0: endpoint {
+						remote-endpoint = <&tcon_top_mixer0_in_mixer0>;
+					};
+				};
+			};
+		};
+
+		tcon_top: tcon-top@5460000 {
+			compatible = "allwinner,sun252i-f101-tcon-top",
+				     "allwinner,sun20i-d1-tcon-top";
+			reg = <0x0 0x05460000 0x0 0x1000>;
+			clocks = <&ccu CLK_BUS_DPSS_TOP>,
+				 <&ccu CLK_TCONLCD>,
+				 <&ccu CLK_TCONLCD>,
+				 <&ccu CLK_TCONLCD>;
+			clock-names = "bus", "tcon-tv0", "tve0", "dsi";
+			clock-output-names = "tcon-top-tv0", "tcon-top-dsi";
+			resets = <&ccu RST_BUS_DPSS_TOP>;
+			#clock-cells = <1>;
+			status = "disabled";
+
+			ports {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				tcon_top_mixer0_in: port@0 {
+					reg = <0>;
+
+					tcon_top_mixer0_in_mixer0: endpoint {
+						remote-endpoint = <&mixer0_out_tcon_top_mixer0>;
+					};
+				};
+
+				tcon_top_mixer0_out: port@1 {
+					reg = <1>;
+					#address-cells = <1>;
+					#size-cells = <0>;
+
+					tcon_top_mixer0_out_tcon_lcd0: endpoint@0 {
+						reg = <0>;
+						remote-endpoint = <&tcon_lcd0_in_tcon_top_mixer0>;
+					};
+				};
+			};
+		};
+
+		tcon_lcd0: lcd-controller@5461000 {
+			compatible = "allwinner,sun252i-f101-tcon-lcd",
+				     "allwinner,sun20i-d1-tcon-lcd";
+			reg = <0x0 0x05461000 0x0 0x1000>;
+			interrupts-extended = <&plic 90 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&ccu CLK_BUS_TCONLCD>, <&ccu CLK_TCONLCD>;
+			clock-names = "ahb", "tcon-ch0";
+			assigned-clocks = <&ccu CLK_TCONLCD>;
+			assigned-clock-parents = <&ccu CLK_PLL_VIDEO0_4X>;
+			clock-output-names = "tcon-pixel-clock";
+			resets = <&ccu RST_BUS_TCONLCD>, <&ccu RST_BUS_LVDS0>;
+			reset-names = "lcd", "lvds";
+			#clock-cells = <0>;
+			status = "disabled";
+
+			ports {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				tcon_lcd0_in: port@0 {
+					reg = <0>;
+					#address-cells = <1>;
+					#size-cells = <0>;
+
+					tcon_lcd0_in_tcon_top_mixer0: endpoint@0 {
+						reg = <0>;
+						remote-endpoint = <&tcon_top_mixer0_out_tcon_lcd0>;
+					};
+				};
+
+				tcon_lcd0_out: port@1 {
+					reg = <1>;
+					#address-cells = <1>;
+					#size-cells = <0>;
+
+					tcon_lcd0_out_dsi: endpoint@1 {
+						reg = <1>;
+						remote-endpoint = <&dsi_in_tcon_lcd0>;
+					};
+				};
+			};
+		};
+
+		dsi0: dsi@5450000 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			compatible = "allwinner,sun252i-f101-mipi-dsi",
+				     "allwinner,sun50i-a100-mipi-dsi";
+			reg = <0x0 0x05450000 0x0 0x1000>;
+			interrupts-extended = <&plic 92 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&ccu CLK_BUS_DSI>, <&ccu CLK_DSI>;
+			clock-names = "bus", "mod";
+			assigned-clocks = <&ccu CLK_DSI>;
+			assigned-clock-rates = <150000000>;
+			resets = <&ccu RST_BUS_DSI>;
+			phys = <&dphy0>;
+			phy-names = "dphy";
+			status = "disabled";
+
+			port {
+				dsi_in_tcon_lcd0: endpoint {
+					remote-endpoint = <&tcon_lcd0_out_dsi>;
+				};
+			};
+		};
+
+		dphy0: phy@5451000 {
+			compatible = "allwinner,sun252i-f101-mipi-dphy",
+				     "allwinner,sun50i-a100-mipi-dphy";
+			reg = <0x0 0x05451000 0x0 0x1000>;
+			clocks = <&ccu CLK_BUS_COMBOPHY0>, <&ccu CLK_COMBOPHY0>;
+			clock-names = "bus", "mod";
+			resets = <&ccu RST_BUS_DSI>;
+			#phy-cells = <0>;
 			status = "disabled";
 		};
 

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only OR MIT
 /dts-v1/;
 
+#include <dt-bindings/pwm/pwm.h>
+
 #include "sun252i-f101.dtsi"
 
 / {
@@ -16,7 +18,7 @@
 	};
 
 	chosen {
-		bootargs = "console=ttyS1,115200n8 earlycon=uart8250,mmio32,0x02500400 loglevel=8 printk.time=1 root=/dev/mtdblock4 rootfstype=squashfs ro";
+		bootargs = "console=tty0 console=ttyS1,115200n8 earlycon=uart8250,mmio32,0x02500400 loglevel=8 printk.time=1 root=/dev/mtdblock4 rootfstype=squashfs ro";
 		stdout-path = "serial1:115200n8";
 	};
 
@@ -62,5 +64,55 @@
 		spi-tx-bus-width = <1>;
 
 		#include "sun252i-f101-nor-partitions.dtsi"
+	};
+};
+
+/* The 1024x768 MIPI DSI panel of the carrier board */
+&pwm0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pwm0_pd22_pin>;
+	status = "okay";
+};
+
+&de {
+	status = "okay";
+};
+
+&mixer0 {
+	status = "okay";
+};
+
+&tcon_top {
+	status = "okay";
+};
+
+&tcon_lcd0 {
+	status = "okay";
+};
+
+&dphy0 {
+	status = "okay";
+};
+
+&dsi0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&dsi_pd_pins>;
+	status = "okay";
+
+	panel@0 {
+		compatible = "jadard,jd9168s";
+		reg = <0>;
+		reset-gpios = <&pio 3 9 GPIO_ACTIVE_LOW>; /* PD9 */
+		backlight = <&backlight>;
+	};
+};
+
+/ {
+	backlight: backlight {
+		compatible = "pwm-backlight";
+		/* PWM0 channel 2 on PD22, low is on */
+		pwms = <&pwm0 2 1000000 PWM_POLARITY_INVERTED>;
+		brightness-levels = <0 4 8 16 32 64 96 128 160 192 224 255>;
+		default-brightness-level = <6>;
 	};
 };
