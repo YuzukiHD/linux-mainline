@@ -9,6 +9,7 @@
  * (C) Copyright 2017 Sootech SA
  */
 
+#include <linux/bitfield.h>
 #include <linux/clk.h>
 #include <linux/clk/sunxi-ng.h>
 #include <linux/delay.h>
@@ -221,6 +222,10 @@
 #define SDXC_CLK_50M_DDR_8BIT	4
 
 #define SDXC_2X_TIMING_MODE	BIT(31)
+#define SDXC_NTSR_CMD_PH	GENMASK(5, 4)
+#define SDXC_NTSR_DAT_PH	GENMASK(9, 8)
+#define SDXC_DRV_DL_CMD_PH	BIT(16)
+#define SDXC_DRV_DL_DAT_PH	BIT(17)
 
 #define SDXC_CAL_START		BIT(15)
 #define SDXC_CAL_DONE		BIT(14)
@@ -264,6 +269,9 @@ struct sunxi_mmc_cfg {
 
 	/* clock hardware can switch between old and new timing modes */
 	bool ccu_has_timings_switch;
+
+	/* no tuning, fixed command/data phases chosen by card clock */
+	bool fixed_phase;
 };
 
 struct sunxi_mmc_host {
@@ -723,6 +731,28 @@ static int sunxi_mmc_clk_set_phase(struct sunxi_mmc_host *host,
 				   struct mmc_ios *ios, u32 rate)
 {
 	int index;
+
+	if (host->cfg->fixed_phase) {
+		u32 drv = readl(host->reg_base + SDXC_REG_DRV_DL);
+		u32 ntsr = readl(host->reg_base + SDXC_REG_SD_NTSR);
+		u32 sample = 0;
+
+		/* command drive is always shifted, data only above 26 MHz */
+		drv |= SDXC_DRV_DL_CMD_PH;
+		if (rate > 26000000 && rate <= 52000000) {
+			drv |= SDXC_DRV_DL_DAT_PH;
+			sample = 1;
+		} else {
+			drv &= ~SDXC_DRV_DL_DAT_PH;
+		}
+		writel(drv, host->reg_base + SDXC_REG_DRV_DL);
+
+		ntsr &= ~(SDXC_NTSR_CMD_PH | SDXC_NTSR_DAT_PH);
+		ntsr |= FIELD_PREP(SDXC_NTSR_CMD_PH, sample) |
+			FIELD_PREP(SDXC_NTSR_DAT_PH, sample);
+		writel(ntsr, host->reg_base + SDXC_REG_SD_NTSR);
+		return 0;
+	}
 
 	/* clk controller delays not used under new timings mode */
 	if (host->use_new_timings)
@@ -1207,6 +1237,15 @@ static const struct sunxi_mmc_cfg sun50i_a100_emmc_cfg = {
 	.needs_new_timings = true,
 };
 
+static const struct sunxi_mmc_cfg sun252i_f101_cfg = {
+	.idma_des_size_bits = 13,
+	.idma_des_shift = 2,
+	.can_calibrate = false,
+	.mask_data0 = true,
+	.needs_new_timings = true,
+	.fixed_phase = true,
+};
+
 static const struct of_device_id sunxi_mmc_of_match[] = {
 	{ .compatible = "allwinner,sun4i-a10-mmc", .data = &sun4i_a10_cfg },
 	{ .compatible = "allwinner,sun5i-a13-mmc", .data = &sun5i_a13_cfg },
@@ -1214,7 +1253,7 @@ static const struct of_device_id sunxi_mmc_of_match[] = {
 	{ .compatible = "allwinner,sun8i-a83t-emmc", .data = &sun8i_a83t_emmc_cfg },
 	{ .compatible = "allwinner,sun9i-a80-mmc", .data = &sun9i_a80_cfg },
 	{ .compatible = "allwinner,sun20i-d1-mmc", .data = &sun20i_d1_cfg },
-	{ .compatible = "allwinner,sun252i-f101-mmc", .data = &sun20i_d1_cfg },
+	{ .compatible = "allwinner,sun252i-f101-mmc", .data = &sun252i_f101_cfg },
 	{ .compatible = "allwinner,sun252i-f101-emmc", .data = &sun50i_a100_emmc_cfg },
 	{ .compatible = "allwinner,sun50i-a64-mmc", .data = &sun50i_a64_cfg },
 	{ .compatible = "allwinner,sun50i-a64-emmc", .data = &sun50i_a64_emmc_cfg },
