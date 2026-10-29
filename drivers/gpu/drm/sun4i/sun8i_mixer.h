@@ -24,6 +24,18 @@
 #define SUN50I_MIXER_GLOBAL_SIZE		0x8
 #define SUN50I_MIXER_GLOBAL_CLK			0xc
 
+/*
+ * F101 display engine top: the internal reset, bus, memory bus and clock
+ * gates are at 0x10..0x1c, bit 0 is the mixer, and the global control of
+ * the mixer is a block at 0x100
+ */
+#define SUN252I_MIXER_TOP_RESET			0x10
+#define SUN252I_MIXER_TOP_AHB_GATE		0x14
+#define SUN252I_MIXER_TOP_MBUS_GATE		0x18
+#define SUN252I_MIXER_TOP_CLK_GATE		0x1c
+#define SUN252I_MIXER_TOP_MIXER			BIT(0)
+#define SUN252I_MIXER_GLB			0x100
+
 #define SUN8I_MIXER_GLOBAL_CTL_RT_EN		BIT(0)
 
 #define SUN8I_MIXER_GLOBAL_DBUFF_ENABLE		BIT(0)
@@ -194,6 +206,7 @@ struct sun8i_layer_cfg {
  * @mod_rate: module clock rate that needs to be set in order to have
  *	a functional block.
  * @map: channel map for DE variants processing YUV separately (DE33)
+ * @f101_top: the top registers are the ones of the F101
  */
 
 struct sun8i_mixer_cfg {
@@ -203,6 +216,7 @@ struct sun8i_mixer_cfg {
 	unsigned int		de_type;
 	unsigned long		mod_rate;
 	unsigned int		map[6];
+	bool			f101_top; /* F101 layout of the top registers */
 };
 
 struct sun8i_mixer {

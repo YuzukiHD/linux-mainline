@@ -15,6 +15,7 @@
 #include <linux/of_graph.h>
 #include <linux/platform_device.h>
 #include <linux/reset.h>
+#include <linux/soc/sunxi/sunxi_sram.h>
 
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_helper.h>
@@ -393,7 +394,10 @@ static void sun8i_mixer_mode_set(struct sunxi_engine *engine,
 	DRM_DEBUG_DRIVER("Updating global size W: %u H: %u\n",
 			 mode->hdisplay, mode->vdisplay);
 
-	if (mixer->cfg->de_type == SUN8I_MIXER_DE33)
+	if (mixer->cfg->f101_top)
+		regmap_write(mixer->top_regs,
+			     SUN252I_MIXER_GLB + SUN50I_MIXER_GLOBAL_SIZE, size);
+	else if (mixer->cfg->de_type == SUN8I_MIXER_DE33)
 		regmap_write(mixer->top_regs, SUN50I_MIXER_GLOBAL_SIZE, size);
 	else
 		regmap_write(mixer->engine.regs, SUN8I_MIXER_GLOBAL_SIZE, size);
@@ -431,7 +435,7 @@ static const struct regmap_config sun8i_top_regmap_config = {
 	.reg_bits	= 32,
 	.val_bits	= 32,
 	.reg_stride	= 4,
-	.max_register	= 0x3c,
+	.max_register	= 0x1ff,
 };
 
 static const struct regmap_config sun8i_disp_regmap_config = {
@@ -476,12 +480,29 @@ static void sun8i_mixer_init(struct sun8i_mixer *mixer)
 		disp_regs = mixer->engine.regs;
 	}
 
-	/* Enable the mixer */
-	regmap_write(top_regs, SUN8I_MIXER_GLOBAL_CTL,
-		     SUN8I_MIXER_GLOBAL_CTL_RT_EN);
+	if (mixer->cfg->f101_top) {
+		/* Take the mixer out of reset and open its gates */
+		regmap_set_bits(top_regs, SUN252I_MIXER_TOP_RESET,
+				SUN252I_MIXER_TOP_MIXER);
+		regmap_set_bits(top_regs, SUN252I_MIXER_TOP_AHB_GATE,
+				SUN252I_MIXER_TOP_MIXER);
+		regmap_set_bits(top_regs, SUN252I_MIXER_TOP_MBUS_GATE,
+				SUN252I_MIXER_TOP_MIXER);
+		regmap_set_bits(top_regs, SUN252I_MIXER_TOP_CLK_GATE,
+				SUN252I_MIXER_TOP_MIXER);
 
-	if (mixer->cfg->de_type == SUN8I_MIXER_DE33)
-		regmap_write(top_regs, SUN50I_MIXER_GLOBAL_CLK, 1);
+		/* Enable the mixer */
+		regmap_write(top_regs,
+			     SUN252I_MIXER_GLB + SUN8I_MIXER_GLOBAL_CTL,
+			     SUN8I_MIXER_GLOBAL_CTL_RT_EN);
+	} else {
+		/* Enable the mixer */
+		regmap_write(top_regs, SUN8I_MIXER_GLOBAL_CTL,
+			     SUN8I_MIXER_GLOBAL_CTL_RT_EN);
+
+		if (mixer->cfg->de_type == SUN8I_MIXER_DE33)
+			regmap_write(top_regs, SUN50I_MIXER_GLOBAL_CLK, 1);
+	}
 
 	/* Set background color to black */
 	regmap_write(disp_regs, SUN8I_MIXER_BLEND_BKCOLOR(base),
@@ -565,6 +586,13 @@ static int sun8i_mixer_bind(struct device *dev, struct device *master,
 	mixer->cfg = of_device_get_match_data(dev);
 	if (!mixer->cfg)
 		return -EINVAL;
+
+	/* The SRAM the engine works in has to be given to it first */
+	if (of_property_present(dev->of_node, "allwinner,sram")) {
+		ret = sunxi_sram_claim(dev);
+		if (ret)
+			return dev_err_probe(dev, ret, "Couldn't claim the SRAM\n");
+	}
 
 	regs = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(regs))
@@ -689,6 +717,9 @@ static void sun8i_mixer_unbind(struct device *dev, struct device *master,
 	clk_disable_unprepare(mixer->mod_clk);
 	clk_disable_unprepare(mixer->bus_clk);
 	reset_control_assert(mixer->reset);
+
+	if (of_property_present(dev->of_node, "allwinner,sram"))
+		sunxi_sram_release(dev);
 }
 
 static const struct component_ops sun8i_mixer_ops = {
@@ -866,6 +897,20 @@ static const struct sun8i_mixer_cfg sun50i_h6_mixer0_cfg = {
 	.vi_num		= 1,
 };
 
+static const struct sun8i_mixer_cfg sun252i_f101_mixer0_cfg = {
+	.lay_cfg = {
+		.de_type	= SUN8I_MIXER_DE33,
+		.scaler_mask	= 0xf,
+		.scanline_yuv	= 4096,
+	},
+	.de_type	= SUN8I_MIXER_DE33,
+	.mod_rate	= 300000000,
+	.ui_num		= 2,
+	.vi_num		= 1,
+	.map		= {0, 3, 4},
+	.f101_top	= true,
+};
+
 static const struct sun8i_mixer_cfg sun50i_h616_mixer0_cfg = {
 	.lay_cfg = {
 		.de_type	= SUN8I_MIXER_DE33,
@@ -923,6 +968,10 @@ static const struct of_device_id sun8i_mixer_of_table[] = {
 	{
 		.compatible = "allwinner,sun50i-h6-de3-mixer-0",
 		.data = &sun50i_h6_mixer0_cfg,
+	},
+	{
+		.compatible = "allwinner,sun252i-f101-de33-mixer-0",
+		.data = &sun252i_f101_mixer0_cfg,
 	},
 	{
 		.compatible = "allwinner,sun50i-h616-de33-mixer-0",
