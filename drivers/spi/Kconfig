@@ -1158,6 +1158,15 @@ config SPI_SUN6I
 	help
 	  This enables using the SPI controller on the Allwinner A31 SoCs.
 
+config SPI_SUNXI_SPIF
+	tristate "Allwinner SPI flash controller"
+	depends on ARCH_SUNXI || COMPILE_TEST
+	depends on RESET_CONTROLLER
+	select SPI_MEM
+	help
+	  This enables using the dedicated SPI flash controller (SPIF) of the
+	  Allwinner F101, which runs one flash command per DMA descriptor.
+
 config SPI_SUNPLUS_SP7021
 	tristate "Sunplus SP7021 SPI controller"
 	depends on SOC_SP7021 || COMPILE_TEST
