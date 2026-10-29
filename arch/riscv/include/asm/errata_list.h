@@ -57,8 +57,14 @@ asm(ALTERNATIVE(	\
  * _val is marked as "will be overwritten", so need to set it to 0
  * in the default case.
  */
+#ifdef CONFIG_64BIT
 #define ALT_SVPBMT_SHIFT 61
 #define ALT_THEAD_MAE_SHIFT 59
+#else
+/* rv32: the memory type is in bits 31:30, there is no T-Head MAE */
+#define ALT_SVPBMT_SHIFT 30
+#define ALT_THEAD_MAE_SHIFT 0
+#endif
 #define ALT_SVPBMT(_val, prot)						\
 asm(ALTERNATIVE_2("li %0, 0\t\nnop",					\
 		  "li %0, %1\t\nslli %0,%0,%3", 0,			\
