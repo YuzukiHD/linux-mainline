@@ -33,17 +33,21 @@
 
 int cedrus_engine_enable(struct cedrus_ctx *ctx)
 {
+	bool inverted = cedrus_is_capable(ctx, CEDRUS_CAPABILITY_MODE_INVERTED);
 	u32 reg = 0;
 
 	/*
 	 * FIXME: This is only valid on 32-bits DDR's, we should test
 	 * it on the A13/A33.
 	 */
-	reg |= VE_MODE_REC_WR_MODE_2MB;
-	reg |= VE_MODE_DDR_MODE_BW_128;
+	if (!inverted) {
+		reg |= VE_MODE_REC_WR_MODE_2MB;
+		reg |= VE_MODE_DDR_MODE_BW_128;
+	}
 
 	switch (ctx->src_fmt.pixelformat) {
 	case V4L2_PIX_FMT_MPEG2_SLICE:
+	case V4L2_PIX_FMT_JPEG:
 		reg |= VE_MODE_DEC_MPEG;
 		break;
 
@@ -60,6 +64,9 @@ int cedrus_engine_enable(struct cedrus_ctx *ctx)
 	default:
 		return -EINVAL;
 	}
+
+	if (inverted)
+		reg ^= VE_MODE_INVERT;
 
 	if (ctx->src_fmt.width == 4096)
 		reg |= VE_MODE_PIC_WIDTH_IS_4096;
@@ -152,6 +159,12 @@ static irqreturn_t cedrus_irq(int irq, void *data)
 	status = ctx->current_codec->irq_status(ctx);
 	if (status == CEDRUS_IRQ_NONE)
 		return IRQ_NONE;
+
+	if (status == CEDRUS_IRQ_CONTINUE) {
+		schedule_delayed_work(&dev->watchdog_work,
+				      msecs_to_jiffies(2000));
+		return IRQ_HANDLED;
+	}
 
 	ctx->current_codec->irq_disable(ctx);
 	ctx->current_codec->irq_clear(ctx);

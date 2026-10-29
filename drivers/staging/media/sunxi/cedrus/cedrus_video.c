@@ -56,6 +56,11 @@ static struct cedrus_format cedrus_formats[] = {
 		.capabilities	= CEDRUS_CAPABILITY_VP8_DEC,
 	},
 	{
+		.pixelformat	= V4L2_PIX_FMT_JPEG,
+		.directions	= CEDRUS_DECODE_SRC,
+		.capabilities	= CEDRUS_CAPABILITY_JPEG_DEC,
+	},
+	{
 		.pixelformat	= V4L2_PIX_FMT_NV12,
 		.directions	= CEDRUS_DECODE_DST,
 		.capabilities	= CEDRUS_CAPABILITY_UNTILED,
@@ -83,6 +88,23 @@ static struct cedrus_format cedrus_formats[] = {
 
 #define CEDRUS_FORMATS_COUNT	ARRAY_SIZE(cedrus_formats)
 
+/*
+ * The JPEG decoder converts its pictures to linear NV12 with the conversion
+ * block, every other decoder writes what its capabilities say.
+ */
+static bool cedrus_format_usable(struct cedrus_ctx *ctx, struct cedrus_format *fmt,
+				 u32 directions)
+{
+	if (!(fmt->directions & directions))
+		return false;
+
+	if ((directions & CEDRUS_DECODE_DST) &&
+	    ctx->src_fmt.pixelformat == V4L2_PIX_FMT_JPEG)
+		return fmt->pixelformat == V4L2_PIX_FMT_NV12;
+
+	return cedrus_is_capable(ctx, fmt->capabilities);
+}
+
 static struct cedrus_format *cedrus_find_format(struct cedrus_ctx *ctx,
 						u32 pixelformat, u32 directions)
 {
@@ -93,8 +115,7 @@ static struct cedrus_format *cedrus_find_format(struct cedrus_ctx *ctx,
 	for (i = 0; i < CEDRUS_FORMATS_COUNT; i++) {
 		fmt = &cedrus_formats[i];
 
-		if (!cedrus_is_capable(ctx, fmt->capabilities) ||
-		    !(fmt->directions & directions))
+		if (!cedrus_format_usable(ctx, fmt, directions))
 			continue;
 
 		if (fmt->pixelformat == pixelformat)
@@ -128,6 +149,7 @@ void cedrus_prepare_format(struct v4l2_pix_format *pix_fmt)
 	case V4L2_PIX_FMT_H264_SLICE:
 	case V4L2_PIX_FMT_HEVC_SLICE:
 	case V4L2_PIX_FMT_VP8_FRAME:
+	case V4L2_PIX_FMT_JPEG:
 		/* Zero bytes per line for encoded source. */
 		bytesperline = 0;
 		/* Choose some minimum size since this can't be 0 */
@@ -196,10 +218,7 @@ static int cedrus_enum_fmt(struct file *file, struct v4l2_fmtdesc *f,
 	index = 0;
 
 	for (i = 0; i < CEDRUS_FORMATS_COUNT; i++) {
-		if (!cedrus_is_capable(ctx, cedrus_formats[i].capabilities))
-			continue;
-
-		if (!(cedrus_formats[i].directions & direction))
+		if (!cedrus_format_usable(ctx, &cedrus_formats[i], direction))
 			continue;
 
 		if (index == f->index)
@@ -262,6 +281,17 @@ static int cedrus_try_fmt_vid_cap_p(struct cedrus_ctx *ctx,
 	pix_fmt->width = ctx->src_fmt.width;
 	pix_fmt->height = ctx->src_fmt.height;
 	cedrus_prepare_format(pix_fmt);
+
+	/*
+	 * The conversion block works on macroblocks of 32x32 pixels; the
+	 * visible part is told by the compose rectangle.
+	 */
+	if (ctx->src_fmt.pixelformat == V4L2_PIX_FMT_JPEG) {
+		pix_fmt->bytesperline = ALIGN(ctx->src_fmt.width, 32);
+		pix_fmt->width = pix_fmt->bytesperline;
+		pix_fmt->height = ALIGN(ctx->src_fmt.height, 32);
+		pix_fmt->sizeimage = pix_fmt->bytesperline * pix_fmt->height * 3 / 2;
+	}
 
 	if (ctx->current_codec->extra_cap_size)
 		pix_fmt->sizeimage +=
@@ -363,7 +393,13 @@ static int cedrus_s_fmt_vid_out_p(struct cedrus_ctx *ctx,
 	case V4L2_PIX_FMT_VP8_FRAME:
 		ctx->current_codec = &cedrus_dec_ops_vp8;
 		break;
+	case V4L2_PIX_FMT_JPEG:
+		ctx->current_codec = &cedrus_dec_ops_jpeg;
+		break;
 	}
+
+	/* JPEG is not a stateless format: its buffers carry no request */
+	vq->requires_requests = ctx->src_fmt.pixelformat != V4L2_PIX_FMT_JPEG;
 
 	/* Propagate format information to capture. */
 	ctx->dst_fmt.colorspace = pix_fmt->colorspace;
@@ -410,6 +446,34 @@ static int cedrus_s_fmt_vid_out(struct file *file, void *priv,
 	return cedrus_s_fmt_vid_out_p(cedrus_file2ctx(file), &f->fmt.pix);
 }
 
+static int cedrus_g_selection(struct file *file, void *priv,
+			      struct v4l2_selection *s)
+{
+	struct cedrus_ctx *ctx = cedrus_file2ctx(file);
+
+	if (s->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
+		return -EINVAL;
+
+	switch (s->target) {
+	case V4L2_SEL_TGT_COMPOSE:
+	case V4L2_SEL_TGT_COMPOSE_DEFAULT:
+		s->r.left = 0;
+		s->r.top = 0;
+		s->r.width = ctx->src_fmt.width;
+		s->r.height = ctx->src_fmt.height;
+		return 0;
+	case V4L2_SEL_TGT_COMPOSE_BOUNDS:
+	case V4L2_SEL_TGT_COMPOSE_PADDED:
+		s->r.left = 0;
+		s->r.top = 0;
+		s->r.width = ctx->dst_fmt.width;
+		s->r.height = ctx->dst_fmt.height;
+		return 0;
+	default:
+		return -EINVAL;
+	}
+}
+
 const struct v4l2_ioctl_ops cedrus_ioctl_ops = {
 	.vidioc_querycap		= cedrus_querycap,
 
@@ -422,6 +486,8 @@ const struct v4l2_ioctl_ops cedrus_ioctl_ops = {
 	.vidioc_g_fmt_vid_out		= cedrus_g_fmt_vid_out,
 	.vidioc_try_fmt_vid_out		= cedrus_try_fmt_vid_out,
 	.vidioc_s_fmt_vid_out		= cedrus_s_fmt_vid_out,
+
+	.vidioc_g_selection		= cedrus_g_selection,
 
 	.vidioc_reqbufs			= v4l2_m2m_ioctl_reqbufs,
 	.vidioc_querybuf		= v4l2_m2m_ioctl_querybuf,

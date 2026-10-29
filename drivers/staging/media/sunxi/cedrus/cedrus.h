@@ -34,11 +34,16 @@
 #define CEDRUS_CAPABILITY_MPEG2_DEC	BIT(3)
 #define CEDRUS_CAPABILITY_VP8_DEC	BIT(4)
 #define CEDRUS_CAPABILITY_H265_10_DEC	BIT(5)
+#define CEDRUS_CAPABILITY_JPEG_DEC	BIT(6)
+/* The decoder numbers of the mode register have bit 3 inverted */
+#define CEDRUS_CAPABILITY_MODE_INVERTED	BIT(7)
 
 enum cedrus_irq_status {
 	CEDRUS_IRQ_NONE,
 	CEDRUS_IRQ_ERROR,
 	CEDRUS_IRQ_OK,
+	/* a part of the job is done, the next part runs */
+	CEDRUS_IRQ_CONTINUE,
 };
 
 enum cedrus_h264_pic_type {
@@ -126,6 +131,16 @@ struct cedrus_ctx {
 
 	union {
 		struct {
+			void		*tile;
+			dma_addr_t	tile_dma;
+			size_t		tile_size;
+			u32		tile_chroma;
+			dma_addr_t	out;
+			u32		width;
+			u32		height;
+			bool		converting;
+		} jpeg;
+		struct {
 			void		*pic_info_buf;
 			dma_addr_t	pic_info_buf_dma;
 			ssize_t		pic_info_buf_size;
@@ -206,6 +221,7 @@ extern struct cedrus_dec_ops cedrus_dec_ops_mpeg2;
 extern struct cedrus_dec_ops cedrus_dec_ops_h264;
 extern struct cedrus_dec_ops cedrus_dec_ops_h265;
 extern struct cedrus_dec_ops cedrus_dec_ops_vp8;
+extern struct cedrus_dec_ops cedrus_dec_ops_jpeg;
 
 static inline void cedrus_write(struct cedrus_dev *dev, u32 reg, u32 val)
 {

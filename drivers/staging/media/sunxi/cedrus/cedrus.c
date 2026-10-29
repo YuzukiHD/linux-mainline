@@ -624,11 +624,10 @@ static const struct cedrus_variant sun20i_d1_cedrus_variant = {
 };
 
 static const struct cedrus_variant sun252i_f101_cedrus_variant = {
-	.capabilities	= CEDRUS_CAPABILITY_UNTILED |
-			  CEDRUS_CAPABILITY_MPEG2_DEC |
-			  CEDRUS_CAPABILITY_H264_DEC |
-			  CEDRUS_CAPABILITY_H265_DEC,
-	.mod_rate	= 512000000,
+	.capabilities	= CEDRUS_CAPABILITY_MODE_INVERTED |
+			  CEDRUS_CAPABILITY_JPEG_DEC |
+			  CEDRUS_CAPABILITY_H264_DEC,
+	.mod_rate	= 300000000,
 };
 
 static const struct cedrus_variant sun50i_a64_cedrus_variant = {
