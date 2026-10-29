@@ -343,6 +343,69 @@ static void sun4i_tcon0_mode_set_dithering(struct sun4i_tcon *tcon,
 	regmap_write(tcon->regs, SUN4I_TCON_FRM_CTL_REG, val);
 }
 
+
+/*
+ * DSI on the F101: the pixel clock comes from the D-PHY (see the TCON TOP),
+ * so the divider of DCLK is 1, and the TCON gets the whole timing of the
+ * mode, not only its size.
+ */
+static void sun4i_tcon0_mode_set_dsi_phy_clock(struct sun4i_tcon *tcon,
+					       const struct drm_display_mode *mode)
+{
+	unsigned int hbp = mode->crtc_htotal - mode->crtc_hsync_start;
+	unsigned int vbp = mode->crtc_vtotal - mode->crtc_vsync_start;
+	unsigned int hsync = mode->crtc_hsync_end - mode->crtc_hsync_start;
+	unsigned int vsync = mode->crtc_vsync_end - mode->crtc_vsync_start;
+	unsigned int delay_lines = vbp > vsync + 3 ? 3 : vbp;
+
+	tcon->dclk_min_div = 1;
+	tcon->dclk_max_div = 1;
+	clk_set_rate(tcon->dclk, mode->crtc_clock * 1000);
+
+	regmap_write(tcon->regs, SUN4I_TCON0_BASIC0_REG,
+		     SUN4I_TCON0_BASIC0_X(mode->crtc_hdisplay) |
+		     SUN4I_TCON0_BASIC0_Y(mode->crtc_vdisplay));
+	regmap_write(tcon->regs, SUN4I_TCON0_BASIC1_REG,
+		     SUN4I_TCON0_BASIC1_H_TOTAL(mode->crtc_htotal) |
+		     SUN4I_TCON0_BASIC1_H_BACKPORCH(hbp));
+	regmap_write(tcon->regs, SUN4I_TCON0_BASIC2_REG,
+		     SUN4I_TCON0_BASIC2_V_TOTAL(mode->crtc_vtotal * 2) |
+		     SUN4I_TCON0_BASIC2_V_BACKPORCH(vbp));
+	regmap_write(tcon->regs, SUN4I_TCON0_BASIC3_REG,
+		     SUN4I_TCON0_BASIC3_V_SYNC(vsync) |
+		     SUN4I_TCON0_BASIC3_H_SYNC(hsync));
+
+	regmap_update_bits(tcon->regs, SUN4I_TCON0_CTL_REG,
+			   SUN4I_TCON0_CTL_IF_MASK | SUN4I_TCON0_CTL_CLK_DELAY_MASK,
+			   SUN4I_TCON0_CTL_IF_8080 | SUN4I_TCON0_CTL_CLK_DELAY(0xf));
+
+	regmap_write(tcon->regs, SUN4I_TCON_ECC_FIFO_REG, SUN4I_TCON_ECC_FIFO_EN);
+
+	regmap_write(tcon->regs, SUN4I_TCON0_CPU_IF_REG,
+		     SUN4I_TCON0_CPU_IF_MODE_DSI | SUN4I_TCON0_CPU_IF_DA |
+		     SUN4I_TCON0_CPU_IF_TRI_FIFO_FLUSH |
+		     SUN4I_TCON0_CPU_IF_TRI_FIFO_EN |
+		     SUN4I_TCON0_CPU_IF_TRI_EN);
+
+	/* The register field is the value minus one */
+	regmap_write(tcon->regs, SUN4I_TCON0_CPU_TRI0_REG,
+		     SUN4I_TCON0_CPU_TRI0_BLOCK_SPACE((mode->crtc_htotal -
+						       mode->crtc_hdisplay) / 2 + 1) |
+		     SUN4I_TCON0_CPU_TRI0_BLOCK_SIZE(mode->crtc_hdisplay));
+	regmap_write(tcon->regs, SUN4I_TCON0_CPU_TRI1_REG,
+		     SUN4I_TCON0_CPU_TRI1_BLOCK_NUM(mode->crtc_vdisplay));
+	regmap_write(tcon->regs, SUN4I_TCON0_CPU_TRI2_REG,
+		     SUN4I_TCON0_CPU_TRI2_START_DELAY(delay_lines *
+						      mode->crtc_htotal / 8 - 1) |
+		     SUN4I_TCON0_CPU_TRI2_TRANS_START_SET(10));
+
+	regmap_write(tcon->regs, SUN4I_TCON_SAFE_PERIOD_REG,
+		     SUN4I_TCON_SAFE_PERIOD_NUM(3000) |
+		     SUN4I_TCON_SAFE_PERIOD_MODE(3));
+
+	regmap_write(tcon->regs, SUN4I_TCON0_IO_TRI_REG, 0xe0000000);
+}
+
 static void sun4i_tcon0_mode_set_cpu(struct sun4i_tcon *tcon,
 				     const struct drm_encoder *encoder,
 				     const struct drm_display_mode *mode)
@@ -354,6 +417,11 @@ static void sun4i_tcon0_mode_set_cpu(struct sun4i_tcon *tcon,
 	u8 lanes = device->lanes;
 	u32 block_space, start_delay;
 	u32 tcon_div;
+
+	if (tcon->quirks->dsi_phy_clock) {
+		sun4i_tcon0_mode_set_dsi_phy_clock(tcon, mode);
+		return;
+	}
 
 	/*
 	 * dclk is required to run at 1/4 the DSI per-lane bit rate.
@@ -1542,6 +1610,13 @@ static const struct sun4i_tcon_quirks sun20i_d1_lcd_quirks = {
 	.set_mux		= sun8i_r40_tcon_tv_set_mux,
 };
 
+static const struct sun4i_tcon_quirks sun252i_f101_lcd_quirks = {
+	.has_channel_0		= true,
+	.dclk_min_div		= 1,
+	.dsi_phy_clock		= true,
+	.set_mux		= sun8i_r40_tcon_tv_set_mux,
+};
+
 /* sun4i_drv uses this list to check if a device node is a TCON */
 const struct of_device_id sun4i_tcon_of_table[] = {
 	{ .compatible = "allwinner,sun4i-a10-tcon", .data = &sun4i_a10_quirks },
@@ -1560,6 +1635,7 @@ const struct of_device_id sun4i_tcon_of_table[] = {
 	{ .compatible = "allwinner,sun9i-a80-tcon-lcd", .data = &sun9i_a80_tcon_lcd_quirks },
 	{ .compatible = "allwinner,sun9i-a80-tcon-tv", .data = &sun9i_a80_tcon_tv_quirks },
 	{ .compatible = "allwinner,sun20i-d1-tcon-lcd", .data = &sun20i_d1_lcd_quirks },
+	{ .compatible = "allwinner,sun252i-f101-tcon-lcd", .data = &sun252i_f101_lcd_quirks },
 	{ .compatible = "allwinner,sun20i-d1-tcon-tv", .data = &sun8i_r40_tv_quirks },
 	{ }
 };

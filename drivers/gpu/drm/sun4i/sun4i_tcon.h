@@ -84,6 +84,7 @@
 #define SUN4I_TCON0_CPU_IF_REG			0x60
 #define SUN4I_TCON0_CPU_IF_MODE_MASK			GENMASK(31, 28)
 #define SUN4I_TCON0_CPU_IF_MODE_DSI			(1 << 28)
+#define SUN4I_TCON0_CPU_IF_DA				BIT(26)
 #define SUN4I_TCON0_CPU_IF_TRI_FIFO_FLUSH		BIT(16)
 #define SUN4I_TCON0_CPU_IF_TRI_FIFO_EN			BIT(2)
 #define SUN4I_TCON0_CPU_IF_TRI_EN			BIT(0)
@@ -244,6 +245,7 @@ struct sun4i_tcon_quirks {
 	bool	supports_lvds;   /* Does the TCON support an LVDS output? */
 	bool	polarity_in_ch0; /* some tcon1 channels have polarity bits in tcon0 pol register */
 	u8	dclk_min_div;	/* minimum divider for TCON0 DCLK */
+	bool	dsi_phy_clock;	/* DSI: pixel clock from the D-PHY, full timings in the TCON */
 
 	/* callback to handle tcon muxing options */
 	int	(*set_mux)(struct sun4i_tcon *, const struct drm_encoder *);
