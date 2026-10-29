@@ -127,6 +127,9 @@
 #define SUN50I_DPHY_TX_SLEW_REG2	0x100
 
 #define SUN50I_DPHY_PLL_REG0		0x104
+#define SUN252I_DPHY_PLL_REG0_UPDATE		BIT(31)
+#define SUN252I_DPHY_PLL_REG0_LS_DIV0(n)	(((n) & 3) << 28)
+#define SUN252I_DPHY_PLL_REG0_LS_DIV1(n)	(((n) & 0xf) << 24)
 #define SUN50I_DPHY_PLL_REG0_CP36_EN		BIT(23)
 #define SUN50I_DPHY_PLL_REG0_LDO_EN		BIT(22)
 #define SUN50I_DPHY_PLL_REG0_EN_LVS		BIT(21)
@@ -142,6 +145,8 @@
 #define SUN50I_DPHY_PLL_REG1_UNLOCK_MDSEL(n)	(((n) & 3) << 14)
 #define SUN50I_DPHY_PLL_REG1_LOCKMDSEL		BIT(13)
 #define SUN50I_DPHY_PLL_REG1_LOCKDET_EN		BIT(12)
+#define SUN252I_DPHY_PLL_REG1_LS_GATING		BIT(21)
+#define SUN252I_DPHY_PLL_REG1_HS_GATING		BIT(22)
 #define SUN50I_DPHY_PLL_REG1_VSETA(n)		(((n) & 0x7) << 9)
 #define SUN50I_DPHY_PLL_REG1_VSETD(n)		(((n) & 0x7) << 6)
 #define SUN50I_DPHY_PLL_REG1_LPF_SW		BIT(5)
@@ -317,6 +322,82 @@ static void sun50i_a100_mipi_dphy_tx_power_on(struct sun6i_dphy *dphy)
 	regmap_update_bits(dphy->regs, SUN6I_DPHY_ANA4_REG,
 			   SUN6I_DPHY_ANA4_REG_EN_MIPI,
 			   SUN6I_DPHY_ANA4_REG_EN_MIPI);
+
+	regmap_update_bits(dphy->regs, SUN50I_COMBO_PHY_REG0,
+			   SUN50I_COMBO_PHY_REG0_EN_MIPI |
+			   SUN50I_COMBO_PHY_REG0_EN_COMBOLDO,
+			   SUN50I_COMBO_PHY_REG0_EN_MIPI |
+			   SUN50I_COMBO_PHY_REG0_EN_COMBOLDO);
+
+	regmap_write(dphy->regs, SUN50I_COMBO_PHY_REG2,
+		     SUN50I_COMBO_PHY_REG2_HS_STOP_DLY(20));
+	udelay(1);
+}
+
+/*
+ * The F101 D-PHY PLL has a low speed output too: the pixel clock of the LCD
+ * controller, which gets it from here. The VCO runs at the lane bit rate
+ * times a post divider (M1 + 1), and the low speed output divides it down
+ * to the pixel clock again, with two dividers in series.
+ */
+static void sun252i_f101_mipi_dphy_tx_power_on(struct sun6i_dphy *dphy)
+{
+	unsigned long symbol_rate = dphy->config.hs_clk_rate;
+	unsigned int bpp = dphy->phy->attrs.bus_width ?: 24;
+	unsigned int coef = bpp / dphy->config.lanes;
+	unsigned int m, n, div0, div1;
+
+	regmap_write(dphy->regs, SUN6I_DPHY_ANA4_REG, 0x84313480);
+
+	regmap_update_bits(dphy->regs, SUN6I_DPHY_ANA2_REG,
+			   SUN6I_DPHY_ANA2_EN_CK_CPU | SUN6I_DPHY_ANA2_REG_ENIB,
+			   SUN6I_DPHY_ANA2_EN_CK_CPU | SUN6I_DPHY_ANA2_REG_ENIB);
+
+	regmap_update_bits(dphy->regs, SUN6I_DPHY_ANA3_REG,
+			   SUN6I_DPHY_ANA3_EN_LDOR | SUN6I_DPHY_ANA3_EN_LDOC |
+			   SUN6I_DPHY_ANA3_EN_LDOD,
+			   SUN6I_DPHY_ANA3_EN_LDOR | SUN6I_DPHY_ANA3_EN_LDOC |
+			   SUN6I_DPHY_ANA3_EN_LDOD);
+
+	regmap_write(dphy->regs, SUN6I_DPHY_ANA0_REG, 0x77);
+
+	regmap_update_bits(dphy->regs, SUN50I_COMBO_PHY_REG0,
+			   SUN50I_COMBO_PHY_REG0_EN_CP,
+			   SUN50I_COMBO_PHY_REG0_EN_CP);
+
+	/* Smallest post divider that keeps the VCO over 1.1 GHz */
+	for (m = 1; m < 16 && symbol_rate * m < 1100000000UL; m++)
+		;
+	n = symbol_rate * m / 24000000;
+	div0 = (coef % 3 == 0) ? 3 : (coef % 2 == 0) ? 2 : 1;
+	div1 = m * coef / div0;
+
+	regmap_update_bits(dphy->regs, SUN50I_DPHY_PLL_REG1,
+			   SUN252I_DPHY_PLL_REG1_LS_GATING |
+			   SUN252I_DPHY_PLL_REG1_HS_GATING,
+			   SUN252I_DPHY_PLL_REG1_LS_GATING |
+			   SUN252I_DPHY_PLL_REG1_HS_GATING);
+
+	regmap_write(dphy->regs, SUN50I_DPHY_PLL_REG2, 0);
+
+	regmap_write(dphy->regs, SUN50I_DPHY_PLL_REG0,
+		     SUN252I_DPHY_PLL_REG0_LS_DIV0(div0 - 1) |
+		     SUN252I_DPHY_PLL_REG0_LS_DIV1(div1 - 1) |
+		     SUN50I_DPHY_PLL_REG0_LDO_EN |
+		     SUN50I_DPHY_PLL_REG0_EN_LVS |
+		     SUN50I_DPHY_PLL_REG0_PLL_EN |
+		     SUN50I_DPHY_PLL_REG0_N(n) |
+		     SUN50I_DPHY_PLL_REG0_M1(m - 1));
+
+	regmap_update_bits(dphy->regs, SUN50I_DPHY_PLL_REG1,
+			   SUN50I_DPHY_PLL_REG1_LOCKDET_EN,
+			   SUN50I_DPHY_PLL_REG1_LOCKDET_EN);
+
+	/* Latch the new dividers */
+	regmap_update_bits(dphy->regs, SUN50I_DPHY_PLL_REG0,
+			   SUN252I_DPHY_PLL_REG0_UPDATE,
+			   SUN252I_DPHY_PLL_REG0_UPDATE);
+	udelay(20);
 
 	regmap_update_bits(dphy->regs, SUN50I_COMBO_PHY_REG0,
 			   SUN50I_COMBO_PHY_REG0_EN_MIPI |
@@ -621,6 +702,10 @@ static const struct sun6i_dphy_variant sun50i_a100_mipi_dphy_variant = {
 	.tx_power_on	= sun50i_a100_mipi_dphy_tx_power_on,
 };
 
+static const struct sun6i_dphy_variant sun252i_f101_mipi_dphy_variant = {
+	.tx_power_on	= sun252i_f101_mipi_dphy_tx_power_on,
+};
+
 static const struct of_device_id sun6i_dphy_of_table[] = {
 	{
 		.compatible	= "allwinner,sun6i-a31-mipi-dphy",
@@ -629,6 +714,10 @@ static const struct of_device_id sun6i_dphy_of_table[] = {
 	{
 		.compatible	= "allwinner,sun50i-a100-mipi-dphy",
 		.data		= &sun50i_a100_mipi_dphy_variant,
+	},
+	{
+		.compatible	= "allwinner,sun252i-f101-mipi-dphy",
+		.data		= &sun252i_f101_mipi_dphy_variant,
 	},
 	{ }
 };
