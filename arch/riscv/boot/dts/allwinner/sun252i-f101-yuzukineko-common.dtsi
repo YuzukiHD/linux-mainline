@@ -118,6 +118,10 @@
 	};
 };
 
+&g2d {
+	status = "okay";
+};
+
 /* The display engine at the top priority, the CPU capped so it cannot starve it */
 &mbus {
 	status = "okay";
